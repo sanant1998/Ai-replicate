@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+/* Design tokens sampled from the reference product's rendered styles. */
+@theme {
+  --color-sand: #e8d5b7;
+  --color-cream: #fffef9;
+  --color-parchment: #fdeede;
+  --color-navy: #2c5282;
+  --color-navy-deep: #1e3a5f;
+  --color-amber: #f59e0b;
+  --color-ember: #ea580c;
+  --color-moss: #22c55e;
+
+  --font-sans: 'Nunito Variable', ui-sans-serif, system-ui, sans-serif;
+
+  --radius-card: 1.25rem;
+}
+
+:root {
+  --background: var(--color-sand);
+  --foreground: #1a1a1a;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+@utility hero-surface {
+  background: radial-gradient(
+    120% 140% at 12% 0%,
+    #fff6e9 0%,
+    #fdeede 45%,
+    #f7e2cf 100%
+  );
+}
+
+@utility flame-gradient {
+  background: linear-gradient(135deg, #f59e0b, #ea580c);
+}
+
+@utility card-surface {
+  background: var(--color-cream);
+  box-shadow: 0 1px 2px rgb(44 82 130 / 0.06), 0 8px 24px -12px rgb(44 82 130 / 0.18);
+}
+
+/* Thin scrollbars inside the chapter list and chat transcript. */
+@utility scroll-slim {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(44 82 130 / 0.25) transparent;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility animate-rise {
+  animation: rise 0.28s ease-out both;
+}
+
+/* Prose defaults for the terms and privacy pages. Tailwind's reset flattens
+   lists and emphasis, and those pages are plain long-form text. */
+.legal-body {
+  line-height: 1.65;
+}
+.legal-body ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: 0.5rem;
+}
+.legal-body strong {
+  font-weight: 800;
+  color: var(--color-navy-deep);
+}
+.legal-body em {
+  font-style: italic;
+}

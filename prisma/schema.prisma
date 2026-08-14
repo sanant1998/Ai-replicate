@@ -1,0 +1,438 @@
+// PaperPath — Prisma 7 schema
+// Connection URL lives in prisma.config.ts (Prisma 7 removed `url` from datasource).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  STUDENT
+  PARENT
+  ADMIN
+}
+
+enum Stream {
+  GENERAL
+  COMMERCE
+  SCIENCE
+}
+
+enum TopicKind {
+  VIDEO
+  ACTIVITY
+}
+
+enum SubscriptionScope {
+  COURSE // one subject for one class
+  CLASS // every subject in a class ("Complete Class 8")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+}
+
+enum ChatMode {
+  TUTOR
+  CAREER
+}
+
+enum QuestionKind {
+  MCQ
+  NUMERIC
+  SHORT
+}
+
+enum PaymentStatus {
+  CREATED
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum CreditReason {
+  DAILY_GRANT
+  TUTOR_MESSAGE
+  MANUAL_ADJUSTMENT
+}
+
+// ---------------------------------------------------------------------------
+// Catalog
+// ---------------------------------------------------------------------------
+
+model Board {
+  id        String       @id @default(cuid())
+  code      String       @unique // CBSE, ICSE, MH, TN...
+  name      String
+  createdAt DateTime     @default(now())
+  classes   ClassLevel[]
+  users     User[]
+
+  @@index([code])
+}
+
+model ClassLevel {
+  id      String  @id @default(cuid())
+  boardId String
+  slug    String // class-8, class-11-commerce
+  label   String // "Class - 8th"
+  grade   Int // 5..12
+  stream  Stream  @default(GENERAL)
+  sortKey Int     @default(0)
+  /// Price in paise for the bundled "all subjects" plan. Null = not sold as a bundle.
+  bundlePricePaise Int?
+  /// Sum of individual subject prices, used to render "Save ₹X vs buying separately".
+  bundleListPricePaise Int?
+
+  board   Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  courses Course[]
+  users   User[]
+
+  @@unique([boardId, slug])
+  @@index([boardId, sortKey])
+}
+
+model Subject {
+  id        String   @id @default(cuid())
+  slug      String   @unique // maths, science, ai-gen-ai
+  name      String
+  icon      String   @default("book") // lucide-ish key rendered by the UI
+  colorFrom String   @default("#F59E0B")
+  colorTo   String   @default("#EA580C")
+  sortKey   Int      @default(0)
+  createdAt DateTime @default(now())
+
+  courses Course[]
+}
+
+/// A Course is the sellable unit: one Subject for one ClassLevel.
+model Course {
+  id           String @id @default(cuid())
+  classLevelId String
+  subjectId    String
+  pricePaise   Int    @default(0)
+  sortKey      Int    @default(0)
+
+  classLevel    ClassLevel     @relation(fields: [classLevelId], references: [id], onDelete: Cascade)
+  subject       Subject        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  chapters      Chapter[]
+  subscriptions Subscription[]
+
+  @@unique([classLevelId, subjectId])
+  @@index([classLevelId, sortKey])
+}
+
+model Chapter {
+  id       String  @id @default(cuid())
+  courseId String
+  index    Int // 1-based, as shown in the UI
+  title    String
+  /// Chapter 1 of every course is free — mirrors the live product's rule.
+  isFree   Boolean @default(false)
+  summary  String?
+
+  course       Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  topics       Topic[]
+  chatSessions ChatSession[]
+  questions    Question[]
+  attempts     QuizAttempt[]
+  bookmarks    Bookmark[]
+
+  @@unique([courseId, index])
+  @@index([courseId, index])
+}
+
+model Topic {
+  id          String    @id @default(cuid())
+  chapterId   String
+  index       Int
+  title       String
+  kind        TopicKind @default(VIDEO)
+  durationSec Int       @default(0)
+  /// HLS manifest or MP4. Null while the lesson is still being produced.
+  videoUrl    String?
+  posterUrl   String?
+
+  chapter  Chapter    @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  progress Progress[]
+  notes    Note[]
+
+  @@unique([chapterId, index])
+  @@index([chapterId, index])
+}
+
+// ---------------------------------------------------------------------------
+// Assessment
+// ---------------------------------------------------------------------------
+
+model Question {
+  id          String       @id @default(cuid())
+  chapterId   String
+  index       Int
+  kind        QuestionKind @default(MCQ)
+  prompt      String
+  /// Choices in display order. Empty for NUMERIC and SHORT questions.
+  options     String[]
+  /// For MCQ this is the 0-based index into `options`, as a string. For NUMERIC
+  /// and SHORT it is the expected value, compared case- and space-insensitively.
+  /// Never sent to the client until the attempt has been submitted.
+  answer      String
+  explanation String?
+  /// 1 easy, 2 medium, 3 hard.
+  difficulty  Int          @default(1)
+  marks       Int          @default(1)
+
+  chapter Chapter      @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  answers QuizAnswer[]
+
+  @@unique([chapterId, index])
+  @@index([chapterId, index])
+}
+
+model QuizAttempt {
+  id          String    @id @default(cuid())
+  userId      String
+  chapterId   String
+  startedAt   DateTime  @default(now())
+  submittedAt DateTime?
+  score       Int       @default(0)
+  maxScore    Int       @default(0)
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chapter Chapter      @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  answers QuizAnswer[]
+
+  @@index([userId, chapterId])
+  @@index([userId, submittedAt])
+}
+
+model QuizAnswer {
+  id         String  @id @default(cuid())
+  attemptId  String
+  questionId String
+  given      String
+  correct    Boolean @default(false)
+
+  attempt  QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, questionId])
+}
+
+// ---------------------------------------------------------------------------
+// Study aids
+// ---------------------------------------------------------------------------
+
+model Note {
+  id        String   @id @default(cuid())
+  userId    String
+  topicId   String
+  body      String
+  /// Playback position the note was taken at, so it can jump back into the video.
+  atSec     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@index([userId, topicId])
+  @@index([userId, createdAt])
+}
+
+model Bookmark {
+  id        String   @id @default(cuid())
+  userId    String
+  chapterId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chapter Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, chapterId])
+  @@index([userId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// People, access, progress
+// ---------------------------------------------------------------------------
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  passwordHash   String
+  name           String
+  role           Role     @default(STUDENT)
+  language       String   @default("en-IN")
+  boardId        String?
+  classLevelId   String?
+  /// Remaining AI-tutor messages for the current day.
+  dailyCredits   Int      @default(5)
+  dailyCreditCap Int      @default(5)
+  /// UTC start of the day the credits were last granted for.
+  creditsGrantedOn DateTime?
+  /// When the account holder confirmed parent/guardian permission. Null for
+  /// accounts created before the consent gate existed.
+  consentAcceptedAt DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  board         Board?         @relation(fields: [boardId], references: [id], onDelete: SetNull)
+  classLevel    ClassLevel?    @relation(fields: [classLevelId], references: [id], onDelete: SetNull)
+  subscriptions Subscription[]
+  progress      Progress[]
+  chatSessions  ChatSession[]
+  credits       CreditLedger[]
+  payments      Payment[]
+  resetTokens   PasswordResetToken[]
+  quizAttempts  QuizAttempt[]
+  notes         Note[]
+  bookmarks     Bookmark[]
+
+  @@index([email])
+}
+
+/// Single-use, time-limited password reset. Only the hash is stored, so a leaked
+/// database row cannot be replayed as a reset link.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Subscription {
+  id           String             @id @default(cuid())
+  userId       String
+  scope        SubscriptionScope
+  status       SubscriptionStatus @default(ACTIVE)
+  /// Set when scope = COURSE. Null for a CLASS-wide bundle.
+  courseId     String?
+  /// Set when scope = CLASS.
+  classLevelId String?
+  pricePaise   Int                @default(0)
+  startsAt     DateTime           @default(now())
+  endsAt       DateTime
+  createdAt    DateTime           @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course  Course?  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  payment Payment?
+
+  @@index([userId, status])
+  @@index([courseId])
+  @@index([classLevelId])
+}
+
+/// One row per checkout attempt. Created before the user is sent to the payment
+/// provider and only flipped to PAID by a signature-verified webhook — the
+/// Subscription is created at that moment, never from a client callback.
+model Payment {
+  id           String            @id @default(cuid())
+  userId       String
+  scope        SubscriptionScope
+  courseId     String?
+  classLevelId String?
+  amountPaise  Int
+  currency     String            @default("INR")
+  status       PaymentStatus     @default(CREATED)
+  provider     String            @default("razorpay")
+  /// Provider's order id. Unique so a replayed webhook cannot grant twice.
+  providerOrderId   String  @unique
+  providerPaymentId String?
+  /// Set once a subscription has been granted for this payment.
+  subscriptionId    String? @unique
+  failureReason     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+}
+
+model Progress {
+  id          String   @id @default(cuid())
+  userId      String
+  topicId     String
+  positionSec Int      @default(0)
+  completed   Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topicId])
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// AI tutor
+// ---------------------------------------------------------------------------
+
+model ChatSession {
+  id        String   @id @default(cuid())
+  userId    String
+  /// Scopes the system prompt to a chapter. Null = general "Ask Questions" session.
+  chapterId String?
+  /// Which system prompt this session runs under. CAREER sessions are kept
+  /// separate so career advice and homework help don't bleed into each other.
+  mode      ChatMode @default(TUTOR)
+  title     String   @default("New session")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chapter  Chapter?      @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  messages ChatMessage[]
+
+  @@index([userId, updatedAt])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  sessionId String
+  role      ChatRole
+  content   String
+  createdAt DateTime @default(now())
+
+  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+}
+
+model CreditLedger {
+  id        String       @id @default(cuid())
+  userId    String
+  delta     Int
+  reason    CreditReason
+  note      String?
+  createdAt DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
