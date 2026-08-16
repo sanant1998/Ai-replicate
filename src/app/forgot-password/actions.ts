@@ -1,6 +1,7 @@
 'use server'
 
 import { redirect } from 'next/navigation'
+import { after } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
@@ -29,11 +30,14 @@ export async function requestReset(_prev: ResetState, formData: FormData): Promi
   if (user) {
     const raw = await issueResetToken(user.id)
     const url = `${await appOrigin()}/reset-password?token=${raw}`
-    try {
-      await sendPasswordReset(user.email, url)
-    } catch (err) {
-      console.error('[reset] delivery failed', err)
-    }
+    // Same reason as signup: the SMTP round trip is slow enough to time the
+    // function out. The token is already written, so the link works regardless
+    // of when the mail actually leaves.
+    after(
+      sendPasswordReset(user.email, url).catch((err) => {
+        console.error('[reset] delivery failed', err)
+      }),
+    )
   }
 
   return { sent: true }

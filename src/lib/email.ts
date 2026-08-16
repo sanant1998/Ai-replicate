@@ -45,6 +45,12 @@ function smtpTransport(): Transporter | null {
     auth: process.env.SMTP_USER
       ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD ?? '' }
       : undefined,
+    // nodemailer waits indefinitely by default. Sends run outside the response
+    // now, but a serverless invocation is still billed and capped while they
+    // do, so an unreachable host has to fail rather than hold the slot open.
+    connectionTimeout: 5_000,
+    greetingTimeout: 5_000,
+    socketTimeout: 10_000,
   })
   return transporter
 }

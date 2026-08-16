@@ -1,6 +1,7 @@
 'use server'
 
 import { redirect } from 'next/navigation'
+import { after } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
@@ -105,7 +106,12 @@ export async function signup(_prev: AuthState, formData: FormData): Promise<Auth
   // just on the reduced credit cap. Blocking a 13-year-old at the door over an
   // email they may not control loses the student; throttling the one thing that
   // costs money removes the incentive to farm addresses.
-  await sendVerificationEmail(user.id, user.email)
+  //
+  // Handed to after() rather than awaited: an SMTP handshake takes seconds, and
+  // charging that to the request meant signup regularly outran a serverless
+  // function's timeout and died — after the account row was already written.
+  // The send still runs to completion, just once the redirect has gone out.
+  after(sendVerificationEmail(user.id, user.email))
 
   await createSession({ uid: user.id, email: user.email })
   redirect(safeNext(formData.get('next')))
@@ -136,7 +142,7 @@ export async function resendVerification(): Promise<AuthState> {
     return { error: 'We have sent a few already — check your spam folder, then try again later.' }
   }
 
-  await sendVerificationEmail(user.id, user.email)
+  after(sendVerificationEmail(user.id, user.email))
   return {}
 }
 
