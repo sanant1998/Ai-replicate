@@ -123,9 +123,19 @@ export default async function CoursesPage() {
                             {course.chapters.length} chapters · {courseTopics} lessons
                           </span>
                           <span className="mt-3 flex items-baseline justify-between">
-                            <span className="font-extrabold text-navy-deep">
-                              {rupees(course.pricePaise)}
-                            </span>
+                            {/* A course still on the schema's default price
+                                would advertise "₹0" and then be refused at
+                                checkout for having no price set. Say nothing
+                                rather than quote a price that isn't one. */}
+                            {course.pricePaise > 0 ? (
+                              <span className="font-extrabold text-navy-deep">
+                                {rupees(course.pricePaise)}
+                              </span>
+                            ) : (
+                              <span className="text-sm font-semibold text-navy/40">
+                                Price coming soon
+                              </span>
+                            )}
                             <span className="text-xs font-bold text-ember">Browse →</span>
                           </span>
                         </Link>

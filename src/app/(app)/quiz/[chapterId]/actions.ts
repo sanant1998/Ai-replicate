@@ -108,6 +108,17 @@ export async function retakeQuiz(formData: FormData) {
   const chapter = await assertChapterAccess(user.id, chapterId)
   if (!chapter) return
 
-  await prisma.quizAttempt.create({ data: { userId: user.id, chapterId } })
+  const burst = await hit(`quiz:retake:${user.id}`, 20, 60_000)
+  if (!burst.ok) return
+
+  // Reuse an unfinished attempt instead of stacking up abandoned ones — the
+  // same rule startAttempt follows. Without it every click of "Try again", and
+  // every double-click, left another empty attempt behind; only the newest is
+  // ever reachable, so the rest are permanent orphans.
+  const open = await prisma.quizAttempt.findFirst({
+    where: { userId: user.id, chapterId, submittedAt: null },
+  })
+  if (!open) await prisma.quizAttempt.create({ data: { userId: user.id, chapterId } })
+
   revalidatePath(`/quiz/${chapterId}`)
 }

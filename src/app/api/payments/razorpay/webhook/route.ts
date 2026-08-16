@@ -92,12 +92,22 @@ export async function POST(req: Request) {
     case 'refund.created':
     case 'refund.processed':
     case 'payment.refunded': {
+      // `amount_refunded` on the payment entity is the running total across
+      // every refund issued against that payment; `refund.entity.amount` is
+      // only the instalment this event announces. Comparing an instalment
+      // against the full price meant two ₹500 refunds on a ₹999 bundle each
+      // looked partial, and access was never taken back — so prefer the
+      // cumulative figure, and take the larger when both arrive.
+      const cumulative = entity?.amount_refunded
+      const instalment = event.payload?.refund?.entity?.amount
       const refunded =
-        event.payload?.refund?.entity?.amount ?? entity?.amount_refunded ?? payment.amountPaise
+        cumulative === undefined && instalment === undefined
+          ? payment.amountPaise
+          : Math.max(cumulative ?? 0, instalment ?? 0)
 
       // A partial refund is a billing adjustment, not a cancellation — someone
-      // who got ₹100 back off a ₹999 bundle keeps the bundle. Only a full
-      // refund takes the access away.
+      // who got ₹100 back off a ₹999 bundle keeps the bundle. Only once the
+      // refunds add up to the full price does the access go away.
       if (refunded < payment.amountPaise) {
         console.warn(
           `[razorpay] partial refund on order ${orderId} (${refunded}/${payment.amountPaise}) — access left in place`,

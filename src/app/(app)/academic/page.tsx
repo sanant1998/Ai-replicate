@@ -132,8 +132,15 @@ export default async function AcademicPage(props: PageProps<'/academic'>) {
             <h1 className="mt-1 text-4xl font-extrabold tracking-tight text-navy sm:text-5xl">
               {classLevel.label}
             </h1>
+            {/* Named from the full course list, not the search results: a query
+                that matches nothing empties `visible`, and reading the subject
+                off it made the header claim "All Subjects" while a single
+                subject was still selected. */}
             <p className="text-lg font-bold text-navy/60">
-              {subjectSlug === 'all' ? 'All Subjects' : visible[0]?.subject.name ?? 'All Subjects'}
+              {subjectSlug === 'all'
+                ? 'All Subjects'
+                : (courses.find((c) => c.subject.slug === subjectSlug)?.subject.name ??
+                  'All Subjects')}
             </p>
           </div>
 

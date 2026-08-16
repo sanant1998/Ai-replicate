@@ -85,9 +85,12 @@ export function QuizRunner({
 
           {q.kind === 'MCQ' ? (
             <div className="mt-3 grid gap-2">
+              {/* Keyed by position, not text: two options that read the same
+                  (a repeated "None of the above", a typo'd duplicate) would
+                  otherwise collide and React would drop one. */}
               {q.options.map((opt, i) => (
                 <label
-                  key={opt}
+                  key={`${q.id}-${i}`}
                   className={clsx(
                     'flex cursor-pointer items-start gap-2.5 rounded-xl border border-navy/12 px-3.5 py-2.5',
                     'font-semibold text-navy-deep transition hover:border-amber',

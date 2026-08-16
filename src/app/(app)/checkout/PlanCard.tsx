@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { startCheckout, type CheckoutState } from './actions'
 import { IconCheck } from '@/components/icons'
@@ -34,6 +35,7 @@ export function PlanCard({
   payload,
   cta,
   featured,
+  signInHref,
 }: {
   title: string
   priceLabel: string
@@ -42,6 +44,13 @@ export function PlanCard({
   payload: { scope: 'COURSE' | 'CLASS'; id: string }
   cta: string
   featured?: boolean
+  /**
+   * Set for a signed-out visitor: the card still shows the price, but the
+   * button becomes a link into sign-in that returns here. startCheckout refuses
+   * an anonymous caller anyway — this just says so before the click instead of
+   * after it.
+   */
+  signInHref?: string
 }) {
   const [state, formAction, pending] = useActionState(startCheckout, initial)
   const [status, setStatus] = useState<string | null>(null)
@@ -129,13 +138,22 @@ export function PlanCard({
         ))}
       </ul>
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="mt-6 w-full rounded-2xl flame-gradient px-4 py-3 font-extrabold text-white shadow-lg shadow-ember/25 transition hover:brightness-105 disabled:opacity-60"
-      >
-        {pending ? 'Starting…' : cta}
-      </button>
+      {signInHref ? (
+        <Link
+          href={signInHref}
+          className="mt-6 block w-full rounded-2xl flame-gradient px-4 py-3 text-center font-extrabold text-white shadow-lg shadow-ember/25 transition hover:brightness-105"
+        >
+          Sign in to buy
+        </Link>
+      ) : (
+        <button
+          type="submit"
+          disabled={pending}
+          className="mt-6 w-full rounded-2xl flame-gradient px-4 py-3 font-extrabold text-white shadow-lg shadow-ember/25 transition hover:brightness-105 disabled:opacity-60"
+        >
+          {pending ? 'Starting…' : cta}
+        </button>
+      )}
 
       {state.error && (
         <p

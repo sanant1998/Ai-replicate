@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { consumeVerificationToken } from '@/lib/verify-email'
-import { UNVERIFIED_CREDIT_CAP } from '@/lib/credits'
+import { ensureDailyCredits, UNVERIFIED_CREDIT_CAP } from '@/lib/credits'
 
 export const metadata = { title: 'Confirm your email — PaperPath' }
 
@@ -25,10 +25,18 @@ export default async function VerifyEmailPage(props: PageProps<'/verify-email'>)
     // updateMany, not update: a second click on the same link must not throw,
     // and re-confirming an already-confirmed address is a no-op rather than a
     // way to reset the timestamp.
-    await prisma.user.updateMany({
+    //
+    // creditsGrantedOn is cleared alongside it. Today's allowance was already
+    // handed out at the unverified cap, and ensureDailyCredits refuses to grant
+    // twice in one UTC day — so without this the page would promise a full
+    // allowance the student does not actually get until tomorrow, and the
+    // sidebar would sit on "2 / 5". Only reached when the row actually changed,
+    // so a second click cannot re-grant.
+    const { count } = await prisma.user.updateMany({
       where: { id: userId, emailVerifiedAt: null },
-      data: { emailVerifiedAt: new Date() },
+      data: { emailVerifiedAt: new Date(), creditsGrantedOn: null },
     })
+    if (count > 0) await ensureDailyCredits(userId)
   }
 
   return (

@@ -12,10 +12,17 @@ export default async function CheckoutPage(props: PageProps<'/checkout'>) {
   const classSlug = typeof sp.class === 'string' ? sp.class : undefined
 
   const session = await readSession()
-  if (!session) {
-    const target = courseId ? `?course=${courseId}` : classSlug ? `?class=${classSlug}` : ''
-    redirect(`/login?next=${encodeURIComponent('/checkout' + target)}`)
-  }
+
+  // Readable while signed out, on purpose. Redirecting an anonymous visitor to
+  // /login meant that every "See plans" link — all of which route through
+  // /pricing into this page — asked them to create an account before they had
+  // been shown a single price. The prices are already public on the landing
+  // page and /courses; hiding them at the one place someone arrives ready to
+  // buy was the odd one out. Buying still requires an account: the card's CTA
+  // becomes a sign-in link, and startCheckout refuses anonymous callers.
+  const self =
+    '/checkout' + (courseId ? `?course=${courseId}` : classSlug ? `?class=${classSlug}` : '')
+  const signInHref = session ? undefined : `/login?next=${encodeURIComponent(self)}`
 
   const course = courseId
     ? await prisma.course.findUnique({
@@ -47,6 +54,11 @@ export default async function CheckoutPage(props: PageProps<'/checkout'>) {
   const live = isConfigured()
   const mockOn = process.env.NODE_ENV !== 'production' && process.env.ALLOW_MOCK_CHECKOUT === '1'
 
+  // A course left on the schema's default price would render "₹0" and then be
+  // refused by startCheckout with "this plan has no price set". Don't offer it.
+  const showCourse = Boolean(course && course.pricePaise > 0)
+  const showBundle = Boolean(classLevel && bundlePrice)
+
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <h1 className="text-3xl font-extrabold text-navy-deep">Choose your plan</h1>
@@ -55,7 +67,7 @@ export default async function CheckoutPage(props: PageProps<'/checkout'>) {
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        {course && (
+        {course && showCourse && (
           <PlanCard
             title={`${course.subject.name} — ${course.classLevel.label}`}
             priceLabel={formatPaise(course.pricePaise)}
@@ -66,6 +78,7 @@ export default async function CheckoutPage(props: PageProps<'/checkout'>) {
             ]}
             payload={{ scope: 'COURSE', id: course.id }}
             cta="Buy this subject"
+            signInHref={signInHref}
           />
         )}
 
@@ -84,9 +97,17 @@ export default async function CheckoutPage(props: PageProps<'/checkout'>) {
             ]}
             payload={{ scope: 'CLASS', id: classLevel.id }}
             cta="Buy the bundle"
+            signInHref={signInHref}
           />
         )}
       </div>
+
+      {!showCourse && !showBundle && (
+        <p className="rounded-2xl bg-navy/5 px-5 py-4 text-sm font-semibold text-navy/60">
+          Nothing is on sale for this class yet — its prices have not been set. Chapter 1 of every
+          subject is free to watch in the meantime.
+        </p>
+      )}
 
       {live ? (
         <p className="rounded-2xl bg-moss/10 px-5 py-4 text-sm font-semibold text-navy/60">

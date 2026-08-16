@@ -15,7 +15,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${origin}/`, changeFrequency: 'weekly', priority: 1 },
     { url: `${origin}/academic`, changeFrequency: 'daily', priority: 0.9 },
     { url: `${origin}/courses`, changeFrequency: 'weekly', priority: 0.8 },
-    { url: `${origin}/pricing`, changeFrequency: 'monthly', priority: 0.7 },
+    // /pricing is not listed: it renders nothing and only ever redirects into
+    // /checkout, which robots.txt disallows. Advertising a URL whose sole job is
+    // to bounce a crawler into a blocked path wastes the crawl and indexes
+    // nothing. /courses carries the same prices and is a real page.
     { url: `${origin}/login`, changeFrequency: 'yearly', priority: 0.3 },
     { url: `${origin}/terms`, changeFrequency: 'yearly', priority: 0.2 },
     { url: `${origin}/privacy`, changeFrequency: 'yearly', priority: 0.2 },

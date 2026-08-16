@@ -41,7 +41,10 @@ export default async function LandingPage() {
       include: { classes: { orderBy: { sortKey: 'asc' }, select: { id: true, label: true } } },
     }),
     prisma.topic.count({ where: { videoUrl: { not: null } } }),
-    prisma.topic.aggregate({ _sum: { durationSec: true } }),
+    // Same filter as the count above. Summing every topic counted lessons that
+    // are still in production towards "hours of teaching" — a number the
+    // visitor cannot watch.
+    prisma.topic.aggregate({ _sum: { durationSec: true }, where: { videoUrl: { not: null } } }),
   ])
 
   // The class the catalog itself would show a signed-out visitor, so the

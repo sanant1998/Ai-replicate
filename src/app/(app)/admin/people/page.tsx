@@ -20,22 +20,42 @@ export default async function PeoplePage(props: PageProps<'/admin/people'>) {
   const sp = await props.searchParams
   const query = typeof sp.q === 'string' ? sp.q.trim() : ''
 
-  const users = await prisma.user.findMany({
-    where: query
-      ? {
-          OR: [
-            { name: { contains: query, mode: 'insensitive' } },
-            { email: { contains: query, mode: 'insensitive' } },
-          ],
-        }
-      : {},
-    orderBy: [{ role: 'asc' }, { createdAt: 'desc' }],
-    take: 100,
-    include: { classLevel: true },
-  })
+  const match = query
+    ? {
+        OR: [
+          { name: { contains: query, mode: 'insensitive' as const } },
+          { email: { contains: query, mode: 'insensitive' as const } },
+        ],
+      }
+    : {}
+
+  /**
+   * Two queries rather than `orderBy: { role: 'asc' }`.
+   *
+   * Postgres sorts an enum by the order its values were declared, and TEACHER
+   * was added later with `ALTER TYPE ... ADD VALUE`, which appends — so the real
+   * order is STUDENT, PARENT, ADMIN, TEACHER. Ordering by role therefore put
+   * staff at the *bottom*, and the `take` then cut them off entirely on any
+   * install with a hundred students: the page that hands out access stopped
+   * listing the people who have it.
+   */
+  const [staff, students] = await Promise.all([
+    prisma.user.findMany({
+      where: { ...match, role: { in: ['ADMIN', 'TEACHER'] } },
+      orderBy: [{ role: 'asc' }, { createdAt: 'desc' }],
+      take: 200,
+      include: { classLevel: true },
+    }),
+    prisma.user.findMany({
+      where: { ...match, role: { notIn: ['ADMIN', 'TEACHER'] } },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      include: { classLevel: true },
+    }),
+  ])
+  const users = [...staff, ...students]
 
   const adminCount = await prisma.user.count({ where: { role: 'ADMIN' } })
-  const staff = users.filter((u) => u.role === 'ADMIN' || u.role === 'TEACHER')
 
   return (
     <div className="space-y-5">

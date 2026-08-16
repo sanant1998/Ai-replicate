@@ -103,6 +103,7 @@ async function hitRedis(
 }
 
 let redisWarned = false
+let memoryOnlyWarned = false
 
 /**
  * Spends one unit against `key`. Async because the Redis backend is a network
@@ -110,7 +111,20 @@ let redisWarned = false
  */
 export async function hit(key: string, limit: number, windowMs: number): Promise<RateVerdict> {
   const cfg = redisConfig()
-  if (!cfg) return hitMemory(key, limit, windowMs)
+  if (!cfg) {
+    // Say this out loud in production. On a serverless host every cold start
+    // gets its own empty map, so the login, signup and tutor caps stop being
+    // caps at all — and nothing else in the app will ever surface that.
+    if (!memoryOnlyWarned && process.env.NODE_ENV === 'production') {
+      memoryOnlyWarned = true
+      console.warn(
+        '[rate-limit] No UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN — counters are ' +
+          'per-process, which on serverless means per-cold-start. Rate limits are effectively ' +
+          'unenforced. Set both to share them.',
+      )
+    }
+    return hitMemory(key, limit, windowMs)
+  }
 
   try {
     return await hitRedis(cfg, key, limit, windowMs)

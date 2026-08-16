@@ -8,11 +8,15 @@
  *
  * Grammar (lowest precedence first):
  *   expression := term      (('+' | '-') term)*
- *   term       := factor    (('*' | '/' | 'mod') factor)*
- *   factor     := unary     ('^' factor)?          -- right associative
- *   unary      := ('-' | '+') unary | postfix
+ *   term       := unary     (('*' | '/' | '%') unary)*
+ *   unary      := ('-' | '+' | '√') unary | power
+ *   power      := postfix   ('^' unary)?           -- right associative
  *   postfix    := primary   '!'*
  *   primary    := number | constant | name '(' args ')' | '(' expression ')'
+ *
+ * Note that unary sits *above* power, not below it: -2^2 parses as -(2^2) = -4,
+ * which is the mathematical convention. Putting power above unary — as an
+ * earlier version of this comment described — would give (-2)^2 = 4.
  */
 
 export type AngleMode = 'deg' | 'rad'

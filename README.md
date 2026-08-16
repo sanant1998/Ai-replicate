@@ -123,6 +123,36 @@ Rate limits sit on the tutor, progress, video, login, signup and password-reset 
 
 ---
 
+## Deploying to Vercel
+
+Four settings are optional locally and load-bearing in production. None of them
+stop the app booting, and each one fails silently — a deployment missing all
+four looks completely healthy from the outside. `src/lib/config.ts` audits them
+at startup and writes any that are missing to the runtime log, so check there
+first if something "works locally".
+
+| Variable | Missing means |
+| --- | --- |
+| `APP_ORIGIN` | Reset and confirmation links are built from the `Host` header, which the caller controls. Set it to the full origin, e.g. `https://paperpath.example`. |
+| `SMTP_HOST…` or `RESEND_API_KEY` | No mail is sent. Reset links go to the server log. |
+| `UPSTASH_REDIS_REST_URL` + `_TOKEN` | Rate-limit counters live in process memory, which on serverless resets every cold start — the login, signup and tutor caps stop being caps. |
+| `CRON_SECRET` | `/api/cron/maintenance` refuses every request, so the tidy-up below never runs. |
+
+`vercel.json` registers the maintenance cron. Vercel attaches
+`Authorization: Bearer $CRON_SECRET` to the invocation automatically once that
+variable is set, which is what the route checks. The schedule is daily at 03:00
+UTC because the Hobby plan allows one cron a day and rejects the deployment
+outright for anything more frequent; on Pro, `0 * * * *` is the better fit — the
+job marks lapsed subscriptions `EXPIRED`, closes checkouts abandoned for over a
+day, and purges spent tokens. None of that gates access (`getEntitlements`
+compares `endsAt` to the clock on every request), but every admin count and
+revenue figure drifts without it.
+
+Also set `DIRECT_DATABASE_URL` to the non-pooled endpoint. `prebuild` runs
+`prisma migrate deploy`, and DDL through a transaction pooler is unreliable.
+
+---
+
 ## Before you ship this
 
 - **Set the Razorpay keys.** With them unset, `/checkout` refuses to sell rather than granting anything. `ALLOW_MOCK_CHECKOUT=1` restores the grant-without-charging path, and is ignored in production builds. You still need to register the webhook URL (`/api/payments/razorpay/webhook`) in the Razorpay dashboard.

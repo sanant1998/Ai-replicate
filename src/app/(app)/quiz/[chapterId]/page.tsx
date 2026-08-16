@@ -99,8 +99,12 @@ export default async function QuizPage(props: PageProps<'/quiz/[chapterId]'>) {
         <ol className="space-y-3">
           {withKey.map((q) => {
             const a = byQuestion.get(q.id)
-            const yours =
-              q.kind === 'MCQ' ? (q.options[Number(a?.given)] ?? '—') : (a?.given || '—')
+            // An unanswered question stores '', and Number('') is 0 — reading
+            // options[0] would show the student the first option as though they
+            // had picked it. Only treat the stored value as an index when there
+            // is one.
+            const chosen = a?.given.trim() ? Number(a.given) : NaN
+            const yours = q.kind === 'MCQ' ? (q.options[chosen] ?? '—') : (a?.given || '—')
             const right = q.kind === 'MCQ' ? (q.options[Number(q.answer)] ?? q.answer) : q.answer
 
             return (

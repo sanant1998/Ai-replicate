@@ -49,9 +49,15 @@ export default async function TutorPage(props: PageProps<'/tutor'>) {
     }
   }
 
-  // Resume the most recent session for this scope so a refresh doesn't lose context.
+  // Resume the most recent session for this scope so a refresh doesn't lose
+  // context. Matched on mode as well as chapter, exactly as /api/tutor does:
+  // both modes use a null chapterId, so without it the career guide would open
+  // showing the last homework conversation — and the session id handed to the
+  // client would be one the API then rejects, silently forking a fresh session
+  // whose history the model never sees.
+  const mode = career ? 'CAREER' : 'TUTOR'
   const existing = await prisma.chatSession.findFirst({
-    where: { userId: user.id, chapterId: chapter?.id ?? null },
+    where: { userId: user.id, chapterId: chapter?.id ?? null, mode },
     orderBy: { updatedAt: 'desc' },
     include: { messages: { orderBy: { createdAt: 'asc' }, take: 40 } },
   })

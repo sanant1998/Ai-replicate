@@ -89,15 +89,27 @@ export function TutorChat({
           const event = /^event: (.+)$/m.exec(frame)?.[1]
           const raw = /^data: (.+)$/m.exec(frame)?.[1]
           if (!event || !raw) continue
-          const data = JSON.parse(raw)
 
-          if (event === 'session') setSessionId(data.sessionId)
-          if (event === 'error') setError(data.message)
-          if (event === 'delta') {
+          // A frame that will not parse is skipped, not thrown. Letting it
+          // escape landed in the catch below, which discards the assistant
+          // bubble — so one malformed frame would delete an answer that had
+          // already streamed most of the way in.
+          let data: { sessionId?: string; message?: string; text?: string }
+          try {
+            data = JSON.parse(raw)
+          } catch {
+            continue
+          }
+
+          if (event === 'session' && data.sessionId) setSessionId(data.sessionId)
+          if (event === 'error') setError(data.message ?? 'The tutor is unavailable right now.')
+          if (event === 'delta' && data.text) {
+            const text = data.text
             setTurns((t) => {
               const next = [...t]
               const last = next[next.length - 1]
-              next[next.length - 1] = { ...last, content: last.content + data.text }
+              if (!last) return t
+              next[next.length - 1] = { ...last, content: last.content + text }
               return next
             })
           }

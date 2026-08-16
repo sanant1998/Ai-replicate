@@ -29,16 +29,28 @@ export default async function HistoryPage() {
         <ul className="rounded-3xl card-surface divide-y divide-navy/8">
           {sessions.map((s) => (
             <li key={s.id}>
+              {/* Career sessions run under a different system prompt and are
+                  stored separately, so they have to reopen in career mode —
+                  linking them to the plain tutor lands the student on a
+                  conversation the career session will never be resumed into. */}
               <Link
-                href={s.chapterId ? `/tutor?chapter=${s.chapterId}` : '/tutor'}
+                href={
+                  s.mode === 'CAREER'
+                    ? '/tutor?mode=career'
+                    : s.chapterId
+                      ? `/tutor?chapter=${s.chapterId}`
+                      : '/tutor'
+                }
                 className="flex items-center justify-between gap-4 px-6 py-4 transition hover:bg-navy/4"
               >
                 <span className="min-w-0">
                   <span className="block truncate font-bold text-navy-deep">{s.title}</span>
                   <span className="text-sm font-semibold text-navy/45">
-                    {s.chapter
-                      ? `${s.chapter.course.subject.name} · Ch ${s.chapter.index}: ${s.chapter.title}`
-                      : 'General questions'}
+                    {s.mode === 'CAREER'
+                      ? 'Career guidance'
+                      : s.chapter
+                        ? `${s.chapter.course.subject.name} · Ch ${s.chapter.index}: ${s.chapter.title}`
+                        : 'General questions'}
                   </span>
                 </span>
                 <span className="shrink-0 text-sm font-bold text-navy/40">{s._count.messages} messages</span>

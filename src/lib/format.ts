@@ -1,8 +1,13 @@
-/** 6240 -> "1h 44m", 1980 -> "33m", 0 -> "—" */
+/** 6240 -> "1h 44m", 1980 -> "33m", 3599 -> "1h 0m", 0 -> "—" */
 export function formatDuration(totalSec: number): string {
   if (!totalSec) return '—'
-  const h = Math.floor(totalSec / 3600)
-  const m = Math.round((totalSec % 3600) / 60)
+  // Round to whole minutes *first*, then split. Rounding the seconds remainder
+  // on its own lets it reach 60 without ever carrying into the hour, which is
+  // how 3599 rendered as "60m" and 7199 as "1h 60m".
+  const totalMin = Math.round(totalSec / 60)
+  if (totalMin === 0) return '<1m'
+  const h = Math.floor(totalMin / 60)
+  const m = totalMin % 60
   return h ? `${h}h ${m}m` : `${m}m`
 }
 

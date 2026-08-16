@@ -36,6 +36,7 @@ async function resolvePlan(scope: 'COURSE' | 'CLASS', id: string) {
       label: `Complete ${classLevel.label}`,
       courseId: null as string | null,
       classLevelId: classLevel.id as string | null,
+      coveredByClassLevelId: classLevel.id,
     }
   }
 
@@ -49,6 +50,8 @@ async function resolvePlan(scope: 'COURSE' | 'CLASS', id: string) {
     label: `${course.subject.name} — ${course.classLevel.label}`,
     courseId: course.id as string | null,
     classLevelId: null as string | null,
+    /** The class this sits in — a bundle for that class already includes it. */
+    coveredByClassLevelId: course.classLevelId,
   }
 }
 
@@ -72,16 +75,29 @@ export async function startCheckout(
   if (!plan) return { error: 'That plan is no longer available' }
   if (plan.amountPaise <= 0) return { error: 'This plan has no price set' }
 
-  // Don't sell what the student already has.
+  // Don't sell what the student already has. Matching only the same scope let a
+  // bundle holder buy a single subject inside the class they had already paid
+  // for in full — a second charge for access they were already getting, and one
+  // getEntitlements would never even consult.
   const existing = await prisma.subscription.findFirst({
     where: {
       userId: user.id,
       status: 'ACTIVE',
       endsAt: { gt: new Date() },
-      ...(scope === 'CLASS' ? { classLevelId: plan.classLevelId } : { courseId: plan.courseId }),
+      OR: [
+        scope === 'CLASS' ? { classLevelId: plan.classLevelId } : { courseId: plan.courseId },
+        { scope: 'CLASS' as const, classLevelId: plan.coveredByClassLevelId },
+      ],
     },
   })
-  if (existing) return { error: 'You already have access to this plan.' }
+  if (existing) {
+    return {
+      error:
+        existing.scope === 'CLASS' && scope === 'COURSE'
+          ? 'Your class bundle already includes this subject.'
+          : 'You already have access to this plan.',
+    }
+  }
 
   if (!isConfigured()) {
     if (!mockAllowed()) {
