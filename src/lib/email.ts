@@ -1,14 +1,17 @@
 import 'server-only'
+import nodemailer, { type Transporter } from 'nodemailer'
 
 /**
- * Transport-agnostic mail sender.
+ * Transport-agnostic mail sender. Three backends, tried in this order:
  *
- * There is no provider wired in by default, because picking one is a deployment
- * decision. Set RESEND_API_KEY to use Resend, or replace `deliver()` with your
- * own SMTP / SES / Postmark call — nothing else in the app needs to change.
+ *   SMTP_HOST      — any SMTP server, including Mailtrap in development
+ *   RESEND_API_KEY — Resend's HTTP API
+ *   neither        — the message is logged instead of sent
  *
- * With no provider configured the message is logged instead of sent, so the
- * password reset flow is exercisable in development without an email account.
+ * The console fallback is what makes password reset and email confirmation
+ * exercisable with no mail account at all; it is not a delivery mechanism, and
+ * `sendPasswordReset` failing silently in production is exactly the bug it
+ * would cause, so configure one of the two above before real users arrive.
  */
 export type Mail = {
   to: string
@@ -18,7 +21,41 @@ export type Mail = {
 
 const FROM = process.env.EMAIL_FROM ?? 'PaperPath <no-reply@paperpath.dev>'
 
+/**
+ * Built once and reused. nodemailer keeps a connection pool behind the
+ * transporter, so constructing one per email would open a fresh SMTP session
+ * (and a fresh TLS handshake) every time.
+ */
+let transporter: Transporter | null = null
+
+function smtpTransport(): Transporter | null {
+  const host = process.env.SMTP_HOST
+  if (!host) return null
+  if (transporter) return transporter
+
+  const port = Number(process.env.SMTP_PORT ?? 587)
+
+  transporter = nodemailer.createTransport({
+    host,
+    port,
+    // Port 465 speaks TLS from the first byte. Everything else (587, 2525, 25)
+    // starts in the clear and upgrades via STARTTLS, which nodemailer does on
+    // its own when the server advertises it.
+    secure: port === 465,
+    auth: process.env.SMTP_USER
+      ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD ?? '' }
+      : undefined,
+  })
+  return transporter
+}
+
 async function deliver(mail: Mail): Promise<void> {
+  const smtp = smtpTransport()
+  if (smtp) {
+    await smtp.sendMail({ from: FROM, to: mail.to, subject: mail.subject, text: mail.text })
+    return
+  }
+
   const key = process.env.RESEND_API_KEY
   if (!key) {
     console.warn(

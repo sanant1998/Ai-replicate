@@ -4,7 +4,11 @@ import { getEntitlements } from '@/lib/access'
 import { prisma } from '@/lib/prisma'
 import { formatPaise } from '@/lib/format'
 import { logout } from '@/app/login/actions'
+import { effectiveCreditCap } from '@/lib/credits'
 import { ClassSettings } from './ClassSettings'
+import { AccountControls, VerifyEmailNotice } from './AccountControls'
+
+export const metadata = { title: 'Profile — PaperPath' }
 
 export default async function ProfilePage() {
   const user = await currentUser()
@@ -27,12 +31,19 @@ export default async function ProfilePage() {
     <div className="mx-auto max-w-2xl space-y-5">
       <h1 className="text-3xl font-extrabold text-navy-deep">Profile</h1>
 
+      {!user.emailVerifiedAt && <VerifyEmailNotice email={user.email} />}
+
       <dl className="rounded-3xl card-surface divide-y divide-navy/8">
         <Row label="Name" value={user.name} />
         <Row label="Email" value={user.email} />
         <Row label="Board" value={user.board?.code ?? '—'} />
         <Row label="Class" value={user.classLevel?.label ?? '—'} />
-        <Row label="Daily credits" value={`${user.dailyCredits} / ${user.dailyCreditCap}`} />
+        {/* The effective cap, not the column: an unconfirmed address is capped
+            lower, and showing "2 / 5" would read as a bug. */}
+        <Row
+          label="Daily credits"
+          value={`${user.dailyCredits} / ${effectiveCreditCap(user)}`}
+        />
         <Row
           label="Access"
           value={ent.classLevelIds.size || ent.courseIds.size ? 'Premium' : 'Free — chapter 1 only'}
@@ -69,6 +80,8 @@ export default async function ProfilePage() {
           Sign out
         </button>
       </form>
+
+      <AccountControls />
     </div>
   )
 }

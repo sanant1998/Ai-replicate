@@ -8,6 +8,12 @@ import { formatDuration, formatPaise } from '@/lib/format'
 import { ClassPicker } from '@/components/ClassPicker'
 import { IconBook, IconChevron, IconClock, IconList, IconLock, IconPlay, IconRobot, IconSparkles } from '@/components/icons'
 
+export const metadata = {
+  title: 'Course catalog — chapter-wise lessons for Class 5 to 12 | PaperPath',
+  description:
+    'Browse CBSE, ICSE and state board courses by class and subject. Chapter 1 of every subject is free to watch.',
+}
+
 /**
  * Which class a signed-out visitor should see. "Most published lessons" rather
  * than "lowest class with any lesson", so adding a single chapter to Class 5

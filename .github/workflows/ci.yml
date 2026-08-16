@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to the same branch makes the first run irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    # The build needs a reachable database: `prebuild` runs `prisma migrate
+    # deploy`, and several pages query during prerender. A throwaway Postgres in
+    # the runner is cheaper and safer than pointing CI at the real one.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: paperpath_ci
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/paperpath_ci
+      # No pooler in front of the service container, so migrations use the same URL.
+      DIRECT_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/paperpath_ci
+      # Not a secret: this database is destroyed with the runner. Never reuse it.
+      AUTH_SECRET: ci-only-secret-not-used-anywhere-else-0000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm ci` runs postinstall, which is `prisma generate` — src/generated is
+      # gitignored, so nothing typechecks until that has run.
+      - run: npm ci
+
+      - run: npm run db:migrate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm run verify:expression
+
+      - name: Payment webhook suite
+        run: npm run verify:payments
+
+      - name: Build
+        run: npm run build

@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { readSession } from '@/lib/session'
-import { spendCredit } from '@/lib/credits'
+import { refundCredit, spendCredit } from '@/lib/credits'
 import { canAccessChapter, getEntitlements } from '@/lib/access'
 import { clientIp, hit, hitIp } from '@/lib/rate-limit'
 
@@ -131,8 +131,15 @@ export async function POST(req: Request) {
   }
 
   // ---- persist the turn ----------------------------------------------------
+  const mode = parsed.data.mode === 'career' ? 'CAREER' : 'TUTOR'
+
+  // Match the mode as well as the owner. A session carries one system prompt,
+  // so replaying a career conversation under the tutor prompt (or the reverse)
+  // would hand the model a history written by a different persona.
   let chatSession = parsed.data.sessionId
-    ? await prisma.chatSession.findFirst({ where: { id: parsed.data.sessionId, userId: user.id } })
+    ? await prisma.chatSession.findFirst({
+        where: { id: parsed.data.sessionId, userId: user.id, mode },
+      })
     : null
 
   if (!chatSession) {
@@ -140,6 +147,7 @@ export async function POST(req: Request) {
       data: {
         userId: user.id,
         chapterId: chapter?.id ?? null,
+        mode,
         title: message.slice(0, 60),
       },
     })
@@ -149,11 +157,16 @@ export async function POST(req: Request) {
     data: { sessionId: chatSession.id, role: 'USER', content: message },
   })
 
-  const history = await prisma.chatMessage.findMany({
-    where: { sessionId: chatSession.id },
-    orderBy: { createdAt: 'asc' },
-    take: 40,
-  })
+  // The newest 40, then flipped back into reading order. Taking 40 ascending
+  // would pin the window to the *oldest* messages, so past turn 40 the model
+  // would stop seeing the question it is being asked.
+  const history = (
+    await prisma.chatMessage.findMany({
+      where: { sessionId: chatSession.id },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: 40,
+    })
+  ).reverse()
 
   // baseURL is left to the SDK, which reads OPENAI_BASE_URL — that is how
   // scripts/mock-openai.mjs stands in for the real API in development.
@@ -163,8 +176,16 @@ export async function POST(req: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder()
-      const send = (event: string, data: unknown) =>
-        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
+      // Once the student navigates away the controller is closed, and enqueuing
+      // into a closed controller throws. Swallow that: the work left to do is
+      // saving the partial answer, not talking to a browser that has gone.
+      const send = (event: string, data: unknown) => {
+        try {
+          controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
+        } catch {
+          /* client is gone */
+        }
+      }
 
       send('session', { sessionId })
 
@@ -193,18 +214,24 @@ export async function POST(req: Request) {
                   : undefined,
               })
 
-        const completion = await openai.chat.completions.create({
-          model: MODEL,
-          max_completion_tokens: 1500,
-          stream: true,
-          messages: [
-            { role: 'system' as const, content: system },
-            ...history.map((m) => ({
-              role: m.role === 'USER' ? ('user' as const) : ('assistant' as const),
-              content: m.content,
-            })),
-          ],
-        })
+        const completion = await openai.chat.completions.create(
+          {
+            model: MODEL,
+            max_completion_tokens: 1500,
+            stream: true,
+            messages: [
+              { role: 'system' as const, content: system },
+              ...history.map((m) => ({
+                role: m.role === 'USER' ? ('user' as const) : ('assistant' as const),
+                content: m.content,
+              })),
+            ],
+          },
+          // Hand the client's disconnect straight through to OpenAI. Without
+          // it, closing the tab leaves the completion running to its token
+          // limit and we pay for an answer nobody will ever read.
+          { signal: req.signal },
+        )
 
         for await (const chunk of completion) {
           const text = chunk.choices[0]?.delta?.content
@@ -214,7 +241,19 @@ export async function POST(req: Request) {
           }
         }
       } catch (err) {
-        send('error', { message: err instanceof Error ? err.message : 'The tutor is unavailable.' })
+        // A disconnect is not a failure. The student got whatever had streamed
+        // by the time they left, so it is kept and charged for; anything else
+        // means the answer never came, and a credit was spent for nothing.
+        if (!req.signal.aborted) {
+          if (!full) {
+            await refundCredit(user.id, 'Tutor request failed').catch((refundErr) =>
+              console.error('[tutor] credit refund failed', refundErr),
+            )
+          }
+          send('error', {
+            message: err instanceof Error ? err.message : 'The tutor is unavailable.',
+          })
+        }
       } finally {
         if (full) {
           await prisma.chatMessage.create({
@@ -223,7 +262,11 @@ export async function POST(req: Request) {
           await prisma.chatSession.update({ where: { id: sessionId }, data: { updatedAt: new Date() } })
         }
         send('done', { ok: true })
-        controller.close()
+        try {
+          controller.close()
+        } catch {
+          /* already closed by the disconnect */
+        }
       }
     },
   })
