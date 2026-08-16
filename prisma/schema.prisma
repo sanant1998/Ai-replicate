@@ -468,4 +468,8 @@ model CreditLedger {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+  /// Counts today's TUTOR_MESSAGE rows across every account, which is how the
+  /// deployment-wide daily model budget is measured. Without it that count
+  /// scans the whole ledger, and the ledger only ever grows.
+  @@index([reason, createdAt])
 }
