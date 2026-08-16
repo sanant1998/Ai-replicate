@@ -190,14 +190,6 @@ export function AuthForm({
         )}
       </p>
 
-      {mode === 'login' && (
-        <div className="mt-5 rounded-2xl bg-navy/5 px-4 py-3 text-[13px] font-semibold text-navy/60">
-          <p className="mb-1 font-extrabold text-navy-deep">Seeded demo accounts</p>
-          <p>student@paperpath.dev — free tier, 5 credits</p>
-          <p>premium@paperpath.dev — Class 8 unlocked, 50 credits</p>
-          <p className="mt-1 text-navy/45">Password for both: password123</p>
-        </div>
-      )}
     </div>
   )
 }
