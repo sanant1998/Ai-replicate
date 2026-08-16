@@ -87,3 +87,25 @@ export async function spendCredit(userId: string, note?: string): Promise<boolea
   })
   return true
 }
+
+/**
+ * Hands a spent credit back when the answer it paid for never arrived.
+ *
+ * The tutor charges before calling the model, because that is the only order
+ * that stops two parallel requests spending the same last credit. The price of
+ * that is a student losing a credit whenever OpenAI is down — which is exactly
+ * when they are least inclined to forgive it. This closes the loop.
+ *
+ * Deliberately allowed to exceed the day's cap: the credit was already granted
+ * once, and clamping here would quietly keep it. The ledger records both legs,
+ * so the balance stays explicable.
+ */
+export async function refundCredit(userId: string, note?: string): Promise<void> {
+  await prisma.user.update({
+    where: { id: userId },
+    data: { dailyCredits: { increment: 1 } },
+  })
+  await prisma.creditLedger.create({
+    data: { userId, delta: 1, reason: 'MANUAL_ADJUSTMENT', note: note ?? 'Tutor request failed' },
+  })
+}

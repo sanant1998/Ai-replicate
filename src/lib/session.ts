@@ -47,15 +47,27 @@ export async function destroySession() {
   jar.delete(COOKIE)
 }
 
+/**
+ * The revocation check lives here rather than in currentUser(), because this is
+ * the only chokepoint every caller shares. Pages that need just a user id —
+ * /notes, /history, /performance, /api/tutor — call readSession() and nothing
+ * else, so a check further up would leave a revoked cookie working on exactly
+ * the pages that hold a student's own data.
+ *
+ * The cost is one indexed lookup per authenticated request. Every caller
+ * queries the user immediately afterwards anyway.
+ */
 export async function readSession(): Promise<Session | null> {
   const jar = await cookies()
   const token = jar.get(COOKIE)?.value
   if (!token) return null
+
+  let claims: Session
   try {
     const { payload } = await jwtVerify(token, secret())
     // Cookies minted before token versioning carry no `tv`; treat them as 0,
     // which is the column default, so existing sessions keep working.
-    return {
+    claims = {
       uid: String(payload.uid),
       email: String(payload.email),
       tv: Number(payload.tv ?? 0),
@@ -63,20 +75,26 @@ export async function readSession(): Promise<Session | null> {
   } catch {
     return null
   }
+
+  const account = await prisma.user.findUnique({
+    where: { id: claims.uid },
+    select: { tokenVersion: true },
+  })
+  // Deleted account, or a cookie signed before the last revocation: the
+  // signature and expiry still check out, but the session is over.
+  if (!account || account.tokenVersion !== claims.tv) return null
+
+  return claims
 }
 
 /** Full user record for the current session, or null. */
 export async function currentUser() {
   const s = await readSession()
   if (!s) return null
-  const user = await prisma.user.findUnique({
+  return prisma.user.findUnique({
     where: { id: s.uid },
     include: { board: true, classLevel: true },
   })
-  // A cookie issued before the last revocation is no longer a valid session,
-  // even though its signature and expiry still check out.
-  if (!user || user.tokenVersion !== s.tv) return null
-  return user
 }
 
 /**

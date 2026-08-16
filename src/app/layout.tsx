@@ -4,9 +4,22 @@ import '@fontsource-variable/nunito'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'PaperPath — CBSE, ICSE & State Board syllabus for Class 5 to 12',
+  // Resolves the relative URLs in per-page openGraph blocks. Without it Next
+  // warns at build time and emits OG tags no crawler can follow.
+  metadataBase: process.env.APP_ORIGIN ? new URL(process.env.APP_ORIGIN) : undefined,
+  title: {
+    default: 'PaperPath — CBSE, ICSE & State Board syllabus for Class 5 to 12',
+    // Pages that set a bare title get the brand appended; the ones that need a
+    // keyword-led title (lessons, catalog) set an absolute string instead.
+    template: '%s | PaperPath',
+  },
   description:
     'Chapter-wise video lectures, an AI tutor that knows the chapter you are on, and progress tracking across every subject.',
+  openGraph: {
+    siteName: 'PaperPath',
+    locale: 'en_IN',
+    type: 'website',
+  },
 }
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {

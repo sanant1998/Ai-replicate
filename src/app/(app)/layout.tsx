@@ -1,6 +1,6 @@
 import { Sidebar, type SidebarUser } from '@/components/Sidebar'
 import { currentUser } from '@/lib/session'
-import { ensureDailyCredits } from '@/lib/credits'
+import { effectiveCreditCap, ensureDailyCredits } from '@/lib/credits'
 import { getEntitlements } from '@/lib/access'
 
 export default async function AppLayout({ children }: LayoutProps<'/'>) {
@@ -13,7 +13,8 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
     sidebarUser = {
       name: user.name,
       dailyCredits: fresh.dailyCredits,
-      dailyCreditCap: fresh.dailyCreditCap,
+      // The cap actually in force today — an unconfirmed address gets less.
+      dailyCreditCap: effectiveCreditCap(fresh),
       boardCode: user.board?.code ?? null,
       classLabel: user.classLevel?.label ?? null,
       language: user.language,

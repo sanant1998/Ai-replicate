@@ -11,6 +11,43 @@ import { NotesPanel } from '@/components/NotesPanel'
 import { toggleBookmark } from '@/app/(app)/study-actions'
 import { IconCheck, IconList, IconLock, IconPlay, IconRobot } from '@/components/icons'
 
+/**
+ * Free chapters are the pages a parent finds by searching for a chapter name,
+ * so the title has to carry the subject and class rather than say "PaperPath".
+ * No entitlement check here: the metadata describes what the lesson *is*, which
+ * is the same sales pitch whether the visitor can play it or not.
+ */
+export async function generateMetadata(props: PageProps<'/learn/[topicId]'>) {
+  const { topicId } = await props.params
+  const topic = await prisma.topic.findUnique({
+    where: { id: topicId },
+    select: {
+      title: true,
+      chapter: {
+        select: {
+          title: true,
+          index: true,
+          course: {
+            select: { subject: { select: { name: true } }, classLevel: { select: { label: true } } },
+          },
+        },
+      },
+    },
+  })
+  if (!topic) return { title: 'Lesson not found — PaperPath' }
+
+  const { chapter } = topic
+  const course = chapter.course
+  const title = `${topic.title} — ${course.subject.name}, ${course.classLevel.label} | PaperPath`
+  const description = `Video lesson on ${topic.title}, from Chapter ${chapter.index}: ${chapter.title} of ${course.subject.name} for ${course.classLevel.label}.`
+
+  return {
+    title,
+    description,
+    openGraph: { title, description, type: 'video.other' as const },
+  }
+}
+
 export default async function LearnPage(props: PageProps<'/learn/[topicId]'>) {
   const { topicId } = await props.params
   const session = await readSession()
