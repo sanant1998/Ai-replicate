@@ -19,7 +19,11 @@ export function LandingAuth({
 
   return (
     <div id="join" className="rounded-3xl card-surface p-6 shadow-xl shadow-navy/10">
-      <AuthForm mode={mode} boards={boards} onSwitchMode={setMode} compact />
+      {/* Keyed by mode so switching tabs remounts the form. Without it the
+          toggle only changes a prop, and useActionState keeps the state from
+          the previous submission — so a failed sign-in leaves "Email or
+          password is incorrect" sitting above an empty Create account form. */}
+      <AuthForm key={mode} mode={mode} boards={boards} onSwitchMode={setMode} compact />
     </div>
   )
 }
