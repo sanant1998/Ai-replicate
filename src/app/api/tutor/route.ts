@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { readSession } from '@/lib/session'
-import { refundCredit, spendCredit } from '@/lib/credits'
+import { refundCredit, spendCredit, tutorBudgetExhausted } from '@/lib/credits'
 import { canAccessChapter, getEntitlements } from '@/lib/access'
 import { clientIp, hit, hitIp } from '@/lib/rate-limit'
 
@@ -119,6 +119,22 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'LOCKED' }, { status: 403 })
       }
     }
+  }
+
+  // ---- budget --------------------------------------------------------------
+  // Checked before the credit is spent, so hitting the site-wide ceiling costs
+  // the student nothing. Deliberately after the entitlement check and before
+  // any call to the model: this is the last gate that can still say no for
+  // free.
+  if (await tutorBudgetExhausted()) {
+    console.error('[tutor] daily site-wide model budget exhausted — refusing further requests')
+    return NextResponse.json(
+      {
+        error: 'BUDGET_EXHAUSTED',
+        message: 'The tutor has reached its limit for today. It will be back tomorrow.',
+      },
+      { status: 503, headers: { 'retry-after': '3600' } },
+    )
   }
 
   // ---- credits -------------------------------------------------------------

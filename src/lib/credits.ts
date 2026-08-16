@@ -40,6 +40,53 @@ export function effectiveCreditCap(user: {
 }
 
 /**
+ * A ceiling on how many model calls the whole deployment may make in one UTC
+ * day, across every account.
+ *
+ * The per-account cap bounds what one student costs. It does not bound what the
+ * site costs, because signup is free: mint accounts and the bill scales with
+ * them. The usual answer is a spend limit on the provider account, and that is
+ * still the better one — it is enforced by the party holding the money. This
+ * exists for the deployment that cannot set one, and it is the only thing
+ * standing between an account-farming script and an unbounded invoice.
+ *
+ * Measured in requests rather than tokens because requests are what we can
+ * count without trusting the provider's accounting to arrive in time. With
+ * `max_completion_tokens` capped at 1500 in the tutor route, a request has a
+ * known worst case, so a request ceiling is a spend ceiling.
+ *
+ * Set TUTOR_DAILY_LIMIT to tune it. Explicitly `0` removes the ceiling, for a
+ * deployment that has a real provider-side budget and would rather not have two.
+ */
+const DEFAULT_DAILY_TUTOR_LIMIT = 200
+
+export function dailyTutorLimit(): number {
+  const raw = process.env.TUTOR_DAILY_LIMIT
+  if (raw === undefined || raw.trim() === '') return DEFAULT_DAILY_TUTOR_LIMIT
+  const parsed = Number(raw)
+  // A typo must not silently uncap the budget — fall back to the default.
+  if (!Number.isFinite(parsed) || parsed < 0) return DEFAULT_DAILY_TUTOR_LIMIT
+  return Math.floor(parsed)
+}
+
+/**
+ * Whether today's deployment-wide allowance is already gone.
+ *
+ * Counts spends, not refunds: a request that failed and was refunded may still
+ * have cost tokens before it failed, and a budget that forgives its own
+ * failures is not a budget.
+ */
+export async function tutorBudgetExhausted(): Promise<boolean> {
+  const limit = dailyTutorLimit()
+  if (limit === 0) return false
+
+  const usedToday = await prisma.creditLedger.count({
+    where: { reason: 'TUTOR_MESSAGE', createdAt: { gte: utcMidnight() } },
+  })
+  return usedToday >= limit
+}
+
+/**
  * Tops a user back up to their daily cap the first time they're seen each UTC day.
  * Idempotent: safe to call on every request.
  */
