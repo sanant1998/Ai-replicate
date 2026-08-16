@@ -1,11 +1,11 @@
 import 'server-only'
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 
 /**
- * Shared, non-streaming Claude call for the Tools pages. The tutor route keeps
+ * Shared, non-streaming OpenAI call for the Tools pages. The tutor route keeps
  * its own streaming client — this one is for "ask once, get a whole answer".
  */
-const MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-5'
+const MODEL = process.env.OPENAI_MODEL ?? 'gpt-4o-mini'
 
 export class AiUnavailable extends Error {}
 
@@ -14,29 +14,32 @@ export async function completeText(opts: {
   prompt: string
   maxTokens?: number
 }): Promise<string> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new AiUnavailable('ANTHROPIC_API_KEY is not configured on the server.')
+  if (!process.env.OPENAI_API_KEY) {
+    throw new AiUnavailable('OPENAI_API_KEY is not configured on the server.')
   }
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  const message = await anthropic.messages.create({
+  // baseURL is left to the SDK, which reads OPENAI_BASE_URL — that is how
+  // scripts/mock-openai.mjs stands in for the real API in development.
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  const completion = await openai.chat.completions.create({
     model: MODEL,
-    max_tokens: opts.maxTokens ?? 2000,
-    system: opts.system,
-    messages: [{ role: 'user', content: opts.prompt }],
+    max_completion_tokens: opts.maxTokens ?? 2000,
+    messages: [
+      { role: 'system', content: opts.system },
+      { role: 'user', content: opts.prompt },
+    ],
   })
 
-  return message.content
-    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-    .map((b) => b.text)
-    .join('')
-    .trim()
+  return (completion.choices[0]?.message?.content ?? '').trim()
 }
 
 /**
  * Same call, but the model is told to answer as JSON matching `shape`. Models
  * sometimes wrap JSON in prose or a code fence, so the first balanced object or
  * array in the reply is extracted rather than trusting the whole string.
+ *
+ * Deliberately not using response_format: json_object — that mode forbids a
+ * top-level array, and the practice generator asks for exactly that.
  */
 export async function completeJson<T>(opts: {
   system: string

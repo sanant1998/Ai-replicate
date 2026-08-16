@@ -19,6 +19,7 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
       language: user.language,
       isPremium: ent.classLevelIds.size > 0 || ent.courseIds.size > 0,
       isAdmin: user.role === 'ADMIN',
+      isStaff: user.role === 'ADMIN' || user.role === 'TEACHER',
     }
   }
 

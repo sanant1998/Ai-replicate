@@ -53,7 +53,7 @@ export default function PrivacyPage() {
       <Section title="Who else sees it">
         <ul>
           <li>
-            <strong>Anthropic</strong> processes AI tutor messages to generate replies. Your name and
+            <strong>OpenAI</strong> processes AI tutor messages to generate replies. Your name and
             class are included so the tutor can address you appropriately.
           </li>
           <li>

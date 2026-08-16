@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import clsx from 'clsx'
 import { IconRobot, IconSend } from '@/components/icons'
+import { Markdown } from '@/components/Markdown'
 
 export type ChatTurn = { id: string; role: 'USER' | 'ASSISTANT'; content: string }
 
@@ -136,7 +137,8 @@ export function TutorChat({
           <div className="mx-auto max-w-md pt-10 text-center">
             <p className="font-extrabold text-navy-deep">What are we working on?</p>
             <p className="mt-1 text-sm font-semibold text-navy/45">
-              Ask anything. The tutor guides you rather than handing over answers.
+              Ask anything — your syllabus, homework, or a question that just came up. You get a
+              straight answer, with the working.
             </p>
             <div className="mt-5 grid gap-2">
               {suggestions.map((s) => (
@@ -159,13 +161,19 @@ export function TutorChat({
           >
             <div
               className={clsx(
-                'max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed',
+                'max-w-[85%] rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed',
                 t.role === 'USER'
-                  ? 'bg-navy font-semibold text-white'
+                  ? 'whitespace-pre-wrap bg-navy font-semibold text-white'
                   : 'bg-navy/6 font-medium text-navy-deep',
               )}
             >
-              {t.content || <span className="inline-block animate-pulse text-navy/40">thinking…</span>}
+              {t.content ? (
+                // Only the assistant writes markdown and LaTeX; what the student
+                // typed is shown verbatim so their own $ and _ are never eaten.
+                t.role === 'ASSISTANT' ? <Markdown>{t.content}</Markdown> : t.content
+              ) : (
+                <span className="inline-block animate-pulse text-navy/40">thinking…</span>
+              )}
             </div>
           </div>
         ))}

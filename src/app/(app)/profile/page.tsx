@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { currentUser } from '@/lib/session'
 import { getEntitlements } from '@/lib/access'
 import { prisma } from '@/lib/prisma'
@@ -8,19 +8,7 @@ import { ClassSettings } from './ClassSettings'
 
 export default async function ProfilePage() {
   const user = await currentUser()
-  if (!user) {
-    return (
-      <div className="mx-auto max-w-md rounded-3xl card-surface px-8 py-12 text-center">
-        <h1 className="text-2xl font-extrabold text-navy-deep">You are signed out</h1>
-        <Link
-          href="/login"
-          className="mt-6 inline-block rounded-full flame-gradient px-7 py-3 font-extrabold text-white"
-        >
-          Sign in
-        </Link>
-      </div>
-    )
-  }
+  if (!user) redirect('/login?next=%2Fprofile')
 
   const ent = await getEntitlements(user.id)
   const subs = await prisma.subscription.findMany({

@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { readSession } from '@/lib/session'
@@ -5,7 +6,7 @@ import { formatDuration } from '@/lib/format'
 
 export default async function PerformancePage() {
   const session = await readSession()
-  if (!session) return <SignedOut />
+  if (!session) redirect('/login?next=%2Fperformance')
 
   const progress = await prisma.progress.findMany({
     where: { userId: session.uid },
@@ -127,16 +128,3 @@ function Tile({ label, value }: { label: string; value: string }) {
   )
 }
 
-function SignedOut() {
-  return (
-    <div className="mx-auto max-w-md rounded-3xl card-surface px-8 py-12 text-center">
-      <h1 className="text-2xl font-extrabold text-navy-deep">Sign in to see your progress</h1>
-      <Link
-        href="/login"
-        className="mt-6 inline-block rounded-full flame-gradient px-7 py-3 font-extrabold text-white"
-      >
-        Sign in
-      </Link>
-    </div>
-  )
-}

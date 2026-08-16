@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { readSession } from '@/lib/session'
 import { assertTopicAccess } from '@/lib/access'
-import { hit } from '@/lib/rate-limit'
+import { clientIp, hit, hitIp } from '@/lib/rate-limit'
 import { upstreamUrl, verifyPlaybackTicket } from '@/lib/video'
 
 export const runtime = 'nodejs'
@@ -19,7 +19,11 @@ export async function GET(req: Request, ctx: RouteContext<'/api/video/[topicId]'
   const session = await readSession()
   const userId = session?.uid ?? null
 
-  const burst = hit(`video:${userId ?? clientKey(req)}`, 60, 60_000)
+  // Signed-in traffic is bucketed by account; anonymous traffic (free chapters)
+  // has nothing else to key on, so it falls back to the IP rules.
+  const burst = userId
+    ? await hit(`video:u:${userId}`, 60, 60_000)
+    : await hitIp('video:ip', clientIp(req), 60, 60_000)
   if (!burst.ok) {
     return NextResponse.json(
       { error: 'RATE_LIMITED' },
@@ -49,8 +53,4 @@ export async function GET(req: Request, ctx: RouteContext<'/api/video/[topicId]'
     status: 302,
     headers: { 'cache-control': 'private, no-store' },
   })
-}
-
-function clientKey(req: Request) {
-  return req.headers.get('user-agent')?.slice(0, 40) ?? 'anon'
 }

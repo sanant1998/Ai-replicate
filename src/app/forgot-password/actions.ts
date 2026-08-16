@@ -1,29 +1,16 @@
 'use server'
 
-import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { sendPasswordReset } from '@/lib/email'
 import { consumeResetToken, issueResetToken } from '@/lib/reset'
-import { createSession } from '@/lib/session'
-import { hit } from '@/lib/rate-limit'
+import { createSession, revokeAllSessions } from '@/lib/session'
+import { actionIp, hit, hitIp } from '@/lib/rate-limit'
+import { appOrigin } from '@/lib/origin'
 
 export type ResetState = { error?: string; sent?: boolean }
-
-async function origin() {
-  const h = await headers()
-  const proto = h.get('x-forwarded-proto') ?? 'http'
-  const host = h.get('host') ?? 'localhost:3000'
-  return process.env.APP_ORIGIN ?? `${proto}://${host}`
-}
-
-async function ipFromHeaders() {
-  if (process.env.TRUST_PROXY !== '1') return 'local'
-  const h = await headers()
-  return h.get('x-forwarded-for')?.split(',')[0]?.trim() ?? h.get('x-real-ip')?.trim() ?? 'local'
-}
 
 export async function requestReset(_prev: ResetState, formData: FormData): Promise<ResetState> {
   const email = z.email().safeParse(formData.get('email'))
@@ -31,8 +18,8 @@ export async function requestReset(_prev: ResetState, formData: FormData): Promi
 
   // Bound how many reset mails one address or origin can trigger. Report the
   // same "sent" screen either way so this stays a non-oracle.
-  const perEmail = hit(`reset:e:${email.data}`, 3, 60 * 60_000)
-  const perIp = hit(`reset:ip:${await ipFromHeaders()}`, 10, 60 * 60_000)
+  const perEmail = await hit(`reset:e:${email.data}`, 3, 60 * 60_000)
+  const perIp = await hitIp('reset:ip', await actionIp(), 10, 60 * 60_000)
   if (!perEmail.ok || !perIp.ok) return { sent: true }
 
   const user = await prisma.user.findUnique({ where: { email: email.data } })
@@ -41,7 +28,7 @@ export async function requestReset(_prev: ResetState, formData: FormData): Promi
   // turns this form into an account-enumeration oracle.
   if (user) {
     const raw = await issueResetToken(user.id)
-    const url = `${await origin()}/reset-password?token=${raw}`
+    const url = `${await appOrigin()}/reset-password?token=${raw}`
     try {
       await sendPasswordReset(user.email, url)
     } catch (err) {
@@ -76,6 +63,11 @@ export async function completeReset(_prev: ResetState, formData: FormData): Prom
     data: { passwordHash: await bcrypt.hash(parsed.data.password, 10) },
   })
 
+  // A reset exists because the account may already be in someone else's hands,
+  // so every cookie issued before now stops working. Revoke first: createSession
+  // stamps the token version it reads, and doing it the other way round would
+  // invalidate the session we are about to hand back to the real owner.
+  await revokeAllSessions(user.id)
   await createSession({ uid: user.id, email: user.email })
   redirect('/academic')
 }

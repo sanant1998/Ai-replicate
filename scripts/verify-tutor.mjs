@@ -41,7 +41,8 @@ check('user turn shown', body.includes('What is a rational number?'))
 
 const after = Number(body.match(/(\d+) credits left today/)?.[1])
 check('one credit consumed', after === before - 1, `${before} -> ${after}`)
-await page.screenshot({ path: './.verify-shots/shot-tutor-live.png' })
+// caret: 'initial' — see the note in verify.mjs; the default mutates the DOM.
+await page.screenshot({ path: './.verify-shots/shot-tutor-live.png', caret: 'initial' })
 
 console.log('\n[C] Transcript survives a reload')
 await page.reload({ waitUntil: 'domcontentloaded' })

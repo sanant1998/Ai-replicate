@@ -1,23 +1,14 @@
 'use server'
 
-import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { createSession, destroySession } from '@/lib/session'
-import { hit } from '@/lib/rate-limit'
-
-/**
- * Server actions don't receive the Request, so read the forwarding headers
- * directly. Same TRUST_PROXY rule as lib/rate-limit: only believe them when the
- * app is actually behind a proxy, or a client can forge itself a fresh bucket.
- */
-async function actionIp() {
-  if (process.env.TRUST_PROXY !== '1') return 'local'
-  const h = await headers()
-  return h.get('x-forwarded-for')?.split(',')[0]?.trim() ?? h.get('x-real-ip')?.trim() ?? 'local'
-}
+import { createSession, currentUser, destroySession, SIGNED_OUT_MESSAGE } from '@/lib/session'
+import { actionIp, hit, hitIp } from '@/lib/rate-limit'
+import { sendEmailVerification } from '@/lib/email'
+import { issueVerificationToken } from '@/lib/verify-email'
+import { appOrigin } from '@/lib/origin'
 
 const Credentials = z.object({
   email: z.email('Enter a valid email address'),
@@ -45,8 +36,8 @@ export async function login(_prev: AuthState, formData: FormData): Promise<AuthS
   if (!parsed.success) return { error: parsed.error.issues[0].message }
 
   // Cap password guesses per address and per origin.
-  const perEmail = hit(`login:e:${parsed.data.email}`, 8, 10 * 60_000)
-  const perIp = hit(`login:ip:${await actionIp()}`, 30, 10 * 60_000)
+  const perEmail = await hit(`login:e:${parsed.data.email}`, 8, 10 * 60_000)
+  const perIp = await hitIp('login:ip', await actionIp(), 30, 10 * 60_000)
   if (!perEmail.ok || !perIp.ok) {
     return { error: 'Too many attempts. Please wait a few minutes and try again.' }
   }
@@ -71,7 +62,7 @@ export async function signup(_prev: AuthState, formData: FormData): Promise<Auth
   if (!parsed.success) return { error: parsed.error.issues[0].message }
 
   // Free signup is what makes the per-account credit cap cheap to farm.
-  const perIp = hit(`signup:ip:${await actionIp()}`, 5, 60 * 60_000)
+  const perIp = await hitIp('signup:ip', await actionIp(), 5, 60 * 60_000)
   if (!perIp.ok) {
     return { error: 'Too many accounts created from here. Please try again later.' }
   }
@@ -110,8 +101,43 @@ export async function signup(_prev: AuthState, formData: FormData): Promise<Auth
     },
   })
 
+  // Signing in immediately is deliberate: an unverified account still works,
+  // just on the reduced credit cap. Blocking a 13-year-old at the door over an
+  // email they may not control loses the student; throttling the one thing that
+  // costs money removes the incentive to farm addresses.
+  await sendVerificationEmail(user.id, user.email)
+
   await createSession({ uid: user.id, email: user.email })
   redirect(safeNext(formData.get('next')))
+}
+
+/**
+ * Issues a confirmation link and mails it. Delivery failure is logged, never
+ * surfaced: the account exists either way, and the student can ask for another
+ * link from their profile.
+ */
+async function sendVerificationEmail(userId: string, email: string) {
+  try {
+    const raw = await issueVerificationToken(userId)
+    await sendEmailVerification(email, `${await appOrigin()}/verify-email?token=${raw}`)
+  } catch (err) {
+    console.error('[signup] verification mail failed', err)
+  }
+}
+
+/** Re-sends the confirmation link for the signed-in account. */
+export async function resendVerification(): Promise<AuthState> {
+  const user = await currentUser()
+  if (!user) return { error: SIGNED_OUT_MESSAGE }
+  if (user.emailVerifiedAt) return {}
+
+  const burst = await hit(`verify:resend:${user.id}`, 3, 60 * 60_000)
+  if (!burst.ok) {
+    return { error: 'We have sent a few already — check your spam folder, then try again later.' }
+  }
+
+  await sendVerificationEmail(user.id, user.email)
+  return {}
 }
 
 export async function logout() {

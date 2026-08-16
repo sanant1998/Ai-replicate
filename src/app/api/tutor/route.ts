@@ -1,11 +1,11 @@
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { readSession } from '@/lib/session'
 import { spendCredit } from '@/lib/credits'
 import { canAccessChapter, getEntitlements } from '@/lib/access'
-import { clientIp, hit } from '@/lib/rate-limit'
+import { clientIp, hit, hitIp } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -17,7 +17,7 @@ const Body = z.object({
   message: z.string().min(1).max(4000),
 })
 
-const MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-5'
+const MODEL = process.env.OPENAI_MODEL ?? 'gpt-4o-mini'
 
 function systemPrompt(ctx: {
   studentName: string
@@ -28,13 +28,15 @@ function systemPrompt(ctx: {
   const lines = [
     `You are the PaperPath AI tutor. You are helping ${ctx.studentName}, a ${ctx.classLabel ?? 'school'} student following the ${ctx.boardCode ?? 'CBSE'} syllabus in India.`,
     '',
-    'How to teach:',
-    '- Lead the student to the answer. Ask one guiding question before giving a full solution.',
-    '- Work in small steps and check understanding between them.',
+    'How to answer:',
+    '- Answer the question directly. Lead with the result, then show the working that gets there.',
+    '- Never withhold an answer to make the student guess, and never reply with only a counter-question. If they ask what 2 x 8 is, the reply contains 16.',
+    '- Keep the working tight enough to follow and learn from — steps, not padding.',
+    '- Answer questions from any subject or none: general knowledge, homework, exam strategy, or a definition. Being off-syllabus is not a reason to deflect.',
     '- Use the notation and vocabulary the student already meets in their textbook.',
-    '- Write mathematics in plain LaTeX between $ delimiters.',
-    '- If a question falls outside the chapter, answer briefly, then steer back.',
-    '- Never do a graded assignment for the student outright; coach them through it.',
+    '- Write mathematics in LaTeX between single $ for inline and $$ for display, e.g. $2 \\times 8 = 16$. Never use \\( \\) or \\[ \\].',
+    '- Use markdown — headings, bold, and lists — when it makes an answer easier to read.',
+    '- If you are unsure or the question is ambiguous, say so plainly instead of inventing an answer.',
   ]
 
   if (ctx.chapter) {
@@ -79,15 +81,15 @@ export async function POST(req: Request) {
   if (!session) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
 
   // Rate limit before any database work so a flood costs almost nothing.
-  const byUser = hit(`tutor:u:${session.uid}`, USER_LIMIT.max, USER_LIMIT.windowMs)
+  const byUser = await hit(`tutor:u:${session.uid}`, USER_LIMIT.max, USER_LIMIT.windowMs)
   if (!byUser.ok) return tooMany(byUser)
 
-  const byIp = hit(`tutor:ip:${clientIp(req)}`, IP_LIMIT.max, IP_LIMIT.windowMs)
+  const byIp = await hitIp('tutor:ip', clientIp(req), IP_LIMIT.max, IP_LIMIT.windowMs)
   if (!byIp.ok) return tooMany(byIp)
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json(
-      { error: 'ANTHROPIC_API_KEY is not configured on the server.' },
+      { error: 'OPENAI_API_KEY is not configured on the server.' },
       { status: 503 },
     )
   }
@@ -153,7 +155,9 @@ export async function POST(req: Request) {
     take: 40,
   })
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  // baseURL is left to the SDK, which reads OPENAI_BASE_URL — that is how
+  // scripts/mock-openai.mjs stands in for the real API in development.
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   const sessionId = chatSession.id
 
   const stream = new ReadableStream({
@@ -166,39 +170,47 @@ export async function POST(req: Request) {
 
       let full = ''
       try {
-        const completion = anthropic.messages.stream({
+        // OpenAI has no separate `system` parameter — the instructions ride at
+        // the head of the message array instead.
+        const system =
+          parsed.data.mode === 'career'
+            ? careerPrompt({
+                studentName: user.name,
+                classLabel: user.classLevel?.label ?? null,
+                boardCode: user.board?.code ?? null,
+              })
+            : systemPrompt({
+                studentName: user.name,
+                classLabel: user.classLevel?.label ?? null,
+                boardCode: user.board?.code ?? null,
+                chapter: chapter
+                  ? {
+                      subject: chapter.course.subject.name,
+                      index: chapter.index,
+                      title: chapter.title,
+                      topics: chapter.topics.map((t) => t.title),
+                    }
+                  : undefined,
+              })
+
+        const completion = await openai.chat.completions.create({
           model: MODEL,
-          max_tokens: 1500,
-          system:
-            parsed.data.mode === 'career'
-              ? careerPrompt({
-                  studentName: user.name,
-                  classLabel: user.classLevel?.label ?? null,
-                  boardCode: user.board?.code ?? null,
-                })
-              : systemPrompt({
-                  studentName: user.name,
-                  classLabel: user.classLevel?.label ?? null,
-                  boardCode: user.board?.code ?? null,
-                  chapter: chapter
-                    ? {
-                        subject: chapter.course.subject.name,
-                        index: chapter.index,
-                        title: chapter.title,
-                        topics: chapter.topics.map((t) => t.title),
-                      }
-                    : undefined,
-                }),
-          messages: history.map((m) => ({
-            role: m.role === 'USER' ? ('user' as const) : ('assistant' as const),
-            content: m.content,
-          })),
+          max_completion_tokens: 1500,
+          stream: true,
+          messages: [
+            { role: 'system' as const, content: system },
+            ...history.map((m) => ({
+              role: m.role === 'USER' ? ('user' as const) : ('assistant' as const),
+              content: m.content,
+            })),
+          ],
         })
 
         for await (const chunk of completion) {
-          if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-            full += chunk.delta.text
-            send('delta', { text: chunk.delta.text })
+          const text = chunk.choices[0]?.delta?.content
+          if (text) {
+            full += text
+            send('delta', { text })
           }
         }
       } catch (err) {

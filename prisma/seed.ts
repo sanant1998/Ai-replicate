@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '../src/generated/prisma/client.js'
 import { QUESTIONS } from './questions.js'
-import { SYLLABUS } from './syllabus.js'
+import { SUBJECT_META, SYLLABUS } from './syllabus.js'
 
 // Seeding writes a lot of rows in sequence, so it uses the direct endpoint when
 // one is configured — same reason migrations do.
@@ -132,15 +132,26 @@ async function main() {
   const class8 = classes.find((c) => c.slug === 'class-8')!
 
   console.log('→ subjects')
-  const maths = await prisma.subject.create({
-    data: { slug: 'maths', name: 'Maths', icon: 'sigma', colorFrom: '#3B82F6', colorTo: '#2C5282', sortKey: 0 },
-  })
-  const science = await prisma.subject.create({
-    data: { slug: 'science', name: 'Science', icon: 'flask', colorFrom: '#22C55E', colorTo: '#15803D', sortKey: 1 },
-  })
-  const ai = await prisma.subject.create({
-    data: { slug: 'ai-gen-ai', name: 'AI & Gen AI', icon: 'sparkles', colorFrom: '#F59E0B', colorTo: '#EA580C', sortKey: 2 },
-  })
+  // Built from SUBJECT_META so the senior-secondary streams can introduce
+  // Physics, Accountancy and the rest without a second place to edit.
+  const subjectBySlug = new Map<string, { id: string }>()
+  for (const [slug, meta] of Object.entries(SUBJECT_META)) {
+    subjectBySlug.set(
+      slug,
+      await prisma.subject.create({
+        data: { slug, ...meta, sortKey: Object.keys(SUBJECT_META).indexOf(slug) },
+      }),
+    )
+  }
+  const subject = (slug: string) => {
+    const found = subjectBySlug.get(slug)
+    if (!found) throw new Error(`Subject "${slug}" is missing from SUBJECT_META`)
+    return found
+  }
+
+  const maths = subject('maths')
+  const science = subject('science')
+  const ai = subject('ai-gen-ai')
 
   console.log('→ courses, chapters, topics')
   const plan: Array<[string, string, ChapterSeed[], 'VIDEO' | 'ACTIVITY', number]> = [
@@ -200,20 +211,28 @@ async function main() {
     }
   }
 
-  // Remaining classes: real NCERT chapter listings where we have them, empty
-  // course shells otherwise, so the class switcher always has somewhere to land.
+  // Remaining classes come straight from SYLLABUS, which names its own subjects
+  // per class — Class 11/12 are Physics/Chemistry/Biology/Maths and the commerce
+  // streams are Accountancy/Business Studies/Economics, not the maths + science
+  // pair that middle school uses.
   for (const cl of classes.filter((c) => c.slug !== 'class-8')) {
     const syllabus = SYLLABUS[cl.slug]
+    if (!syllabus) {
+      console.warn(`  ! no syllabus for ${cl.slug} — skipping`)
+      continue
+    }
 
-    for (const [i, s] of [maths, science].entries()) {
+    for (const [i, entry] of syllabus.entries()) {
       const course = await prisma.course.create({
-        data: { classLevelId: cl.id, subjectId: s.id, pricePaise: SUBJECT_PRICE_PAISE, sortKey: i },
+        data: {
+          classLevelId: cl.id,
+          subjectId: subject(entry.slug).id,
+          pricePaise: SUBJECT_PRICE_PAISE,
+          sortKey: i,
+        },
       })
 
-      const chapters = syllabus?.[s.slug === 'maths' ? 'maths' : 'science']
-      if (!chapters) continue
-
-      for (const [ci, ch] of chapters.entries()) {
+      for (const [ci, ch] of entry.chapters.entries()) {
         await prisma.chapter.create({
           data: {
             courseId: course.id,
@@ -250,6 +269,21 @@ async function main() {
       classLevelId: class8.id,
       dailyCredits: 5,
       creditsGrantedOn: today,
+    },
+  })
+
+  await prisma.user.create({
+    data: {
+      email: 'teacher@paperpath.dev',
+      passwordHash,
+      name: 'Anita Rao',
+      role: 'TEACHER',
+      boardId: cbse.id,
+      classLevelId: class8.id,
+      dailyCredits: 50,
+      dailyCreditCap: 50,
+      creditsGrantedOn: today,
+      consentAcceptedAt: new Date(),
     },
   })
 

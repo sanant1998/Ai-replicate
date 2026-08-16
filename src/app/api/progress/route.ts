@@ -16,7 +16,7 @@ export async function POST(req: Request) {
   if (!session) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
 
   // The player posts a heartbeat every few seconds; this only trips on abuse.
-  const burst = hit(`progress:u:${session.uid}`, 60, 60_000)
+  const burst = await hit(`progress:u:${session.uid}`, 60, 60_000)
   if (!burst.ok) {
     return NextResponse.json(
       { error: 'RATE_LIMITED' },

@@ -1,14 +1,14 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
-import { isAdmin } from '@/lib/admin'
+import { isStaff } from '@/lib/admin'
 import { formatDuration } from '@/lib/format'
 import { Forbidden } from '../../Forbidden'
 import { QuestionEditor, TopicEditor } from './Editors'
 import { deleteQuestion, deleteTopic } from '../../actions'
 
 export default async function AdminChapterPage(props: PageProps<'/admin/chapter/[chapterId]'>) {
-  if (!(await isAdmin())) return <Forbidden />
+  if (!(await isStaff())) return <Forbidden />
   const { chapterId } = await props.params
 
   const chapter = await prisma.chapter.findUnique({

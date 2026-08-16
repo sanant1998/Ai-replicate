@@ -1,13 +1,13 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
-import { isAdmin } from '@/lib/admin'
+import { isStaff } from '@/lib/admin'
 import { Forbidden } from '../../Forbidden'
 import { ChapterEditor } from './ChapterEditor'
 import { deleteChapter } from '../../actions'
 
 export default async function AdminCoursePage(props: PageProps<'/admin/course/[courseId]'>) {
-  if (!(await isAdmin())) return <Forbidden />
+  if (!(await isStaff())) return <Forbidden />
   const { courseId } = await props.params
 
   const course = await prisma.course.findUnique({

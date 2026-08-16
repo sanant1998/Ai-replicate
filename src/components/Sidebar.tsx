@@ -9,13 +9,17 @@ import {
   IconChart,
   IconCourses,
   IconHistory,
+  IconList,
   IconProfile,
   IconSparkles,
   IconTools,
 } from '@/components/icons'
 
 const NAV = [
-  { href: '/academic', label: 'Courses', Icon: IconCourses },
+  // /courses is the catalog of everything on offer; /academic is the chapter
+  // browser for the class you are actually studying. Both exist on purpose.
+  { href: '/courses', label: 'Courses', Icon: IconCourses },
+  { href: '/academic', label: 'Academic', Icon: IconList },
   { href: '/tutor', label: 'Ask Questions', Icon: IconAsk },
   { href: '/performance', label: 'Performance Analysis', Icon: IconChart },
   { href: '/notes', label: 'Notes & Saved', Icon: IconBook },
@@ -33,6 +37,8 @@ export type SidebarUser = {
   language: string
   isPremium: boolean
   isAdmin: boolean
+  /** Teacher or admin — controls whether the staff link appears at all. */
+  isStaff: boolean
 }
 
 export function Sidebar({ user }: { user: SidebarUser | null }) {
@@ -40,8 +46,8 @@ export function Sidebar({ user }: { user: SidebarUser | null }) {
 
   // The admin link is hidden for everyone else; the pages and actions enforce
   // the role themselves, so this is presentation, not the access control.
-  const nav = user?.isAdmin
-    ? [...NAV, { href: '/admin', label: 'Content Admin', Icon: IconTools }]
+  const nav = user?.isStaff
+    ? [...NAV, { href: '/admin', label: user.isAdmin ? 'Content Admin' : 'Teacher Desk', Icon: IconTools }]
     : NAV
 
   return (

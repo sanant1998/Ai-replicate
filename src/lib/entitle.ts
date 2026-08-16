@@ -51,3 +51,58 @@ export async function markPaymentFailed(paymentId: string, reason: string) {
     data: { status: 'FAILED', failureReason: reason.slice(0, 400) },
   })
 }
+
+/**
+ * Takes back what a payment bought, when the provider says the money went back.
+ *
+ * The mirror image of grantForPayment, and the half that was missing: without
+ * it a student could buy a year, refund inside the seven days the terms
+ * promise, and keep the year. Cancelling the subscription is enough to close
+ * that — getEntitlements only counts ACTIVE rows, and every gate re-reads them
+ * per request, so access stops on the next click rather than at renewal.
+ *
+ * Idempotent, like the grant: a provider that sends refund.created twice, or
+ * sends it alongside payment.refunded, must not double-apply.
+ */
+export async function revokeForPayment(
+  paymentId: string,
+  refundedPaise?: number,
+): Promise<'revoked' | 'already' | 'missing'> {
+  const payment = await prisma.payment.findUnique({ where: { id: paymentId } })
+  if (!payment) return 'missing'
+  if (payment.refundedAt) return 'already'
+
+  await prisma.$transaction(async (tx) => {
+    if (payment.subscriptionId) {
+      await tx.subscription.update({
+        where: { id: payment.subscriptionId },
+        data: { status: 'CANCELLED', endsAt: new Date() },
+      })
+    }
+
+    await tx.payment.update({
+      where: { id: payment.id },
+      data: {
+        status: 'REFUNDED',
+        refundedAt: new Date(),
+        refundedPaise: refundedPaise ?? payment.amountPaise,
+      },
+    })
+
+    // The bundle raised this account's tutor allowance; the refund lowers it
+    // again. Clamp today's balance rather than assigning it, so a student who
+    // has already spent down to 1 is not handed 5 back on the way out.
+    if (payment.scope === 'CLASS') {
+      const user = await tx.user.findUniqueOrThrow({
+        where: { id: payment.userId },
+        select: { dailyCredits: true },
+      })
+      await tx.user.update({
+        where: { id: payment.userId },
+        data: { dailyCreditCap: 5, dailyCredits: Math.min(user.dailyCredits, 5) },
+      })
+    }
+  })
+
+  return 'revoked'
+}

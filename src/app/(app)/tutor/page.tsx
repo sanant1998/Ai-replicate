@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { readSession } from '@/lib/session'
 import { ensureDailyCredits } from '@/lib/credits'
@@ -24,20 +24,15 @@ export default async function TutorPage(props: PageProps<'/tutor'>) {
 
   const session = await readSession()
   if (!session) {
-    return (
-      <div className="mx-auto max-w-md rounded-3xl card-surface px-8 py-12 text-center">
-        <h1 className="text-2xl font-extrabold text-navy-deep">Sign in to use the AI tutor</h1>
-        <p className="mt-2 font-semibold text-navy/55">
-          Every account gets free daily credits.
-        </p>
-        <Link
-          href="/login"
-          className="mt-6 inline-block rounded-full flame-gradient px-7 py-3 font-extrabold text-white shadow-lg shadow-ember/25"
-        >
-          Sign in
-        </Link>
-      </div>
-    )
+    // Send them straight to sign-in rather than showing a dead-end card, and
+    // carry the destination so Career Guide reopens in career mode afterwards
+    // instead of dropping them on the general tutor.
+    const target = career
+      ? '/tutor?mode=career'
+      : chapterId
+        ? `/tutor?chapter=${encodeURIComponent(chapterId)}`
+        : '/tutor'
+    redirect(`/login?next=${encodeURIComponent(target)}`)
   }
 
   const user = await ensureDailyCredits(session.uid)

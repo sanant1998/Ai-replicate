@@ -24,7 +24,7 @@ export async function addNote(_prev: NoteState, formData: FormData): Promise<Not
     throw err
   }
 
-  const burst = hit(`note:${user.id}`, 30, 60_000)
+  const burst = await hit(`note:${user.id}`, 30, 60_000)
   if (!burst.ok) return { error: 'Slow down a moment.' }
 
   const parsed = NoteInput.safeParse({

@@ -21,6 +21,42 @@
   --foreground: #1a1a1a;
 }
 
+/* Tool shell.
+   The dark toggle is deliberately scoped to `.tool-shell` rather than the html
+   element: the rest of the app has no dark styles, so flipping a global class
+   would leave the sidebar and catalog unreadable behind the overlay. */
+.tool-shell {
+  --shell-bg: #f3e2c9;
+  --shell-panel: var(--color-cream);
+  --shell-raise: #ffffff;
+  --shell-text: var(--color-navy-deep);
+  --shell-muted: rgb(44 82 130 / 0.55);
+  --shell-line: rgb(44 82 130 / 0.12);
+  --shell-active: rgb(44 82 130 / 0.07);
+}
+
+.tool-shell[data-theme='dark'] {
+  --shell-bg: #131b26;
+  --shell-panel: #1a2432;
+  --shell-raise: #22303f;
+  --shell-text: #e9eff7;
+  --shell-muted: rgb(233 239 247 / 0.6);
+  --shell-line: rgb(233 239 247 / 0.14);
+  --shell-active: rgb(233 239 247 / 0.09);
+}
+
+/* Ketcher paints its own light chrome and has no dark theme of its own, so it
+   keeps a light surface even when the shell is dark. */
+.tool-shell[data-theme='dark'] .ketcher-frame {
+  background: #ffffff;
+}
+
+@utility shell-title {
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

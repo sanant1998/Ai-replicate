@@ -38,6 +38,20 @@ async function deliver(mail: Mail): Promise<void> {
   }
 }
 
+export async function sendEmailVerification(to: string, verifyUrl: string) {
+  await deliver({
+    to,
+    subject: 'Confirm your email for PaperPath',
+    text: [
+      'Welcome to PaperPath.',
+      '',
+      `Confirm this address within 24 hours to unlock your full daily allowance of AI tutor questions:\n${verifyUrl}`,
+      '',
+      'If you did not create this account, ignore this email — nothing further will happen.',
+    ].join('\n'),
+  })
+}
+
 export async function sendPasswordReset(to: string, resetUrl: string) {
   await deliver({
     to,

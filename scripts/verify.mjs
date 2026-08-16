@@ -25,7 +25,11 @@ page.on('pageerror', (e) => consoleErrors.push(String(e)))
 
 async function shot(name) {
   const p = `./.verify-shots/shot-${name}.png`
-  await page.screenshot({ path: p, fullPage: false })
+  // caret: 'initial' — the default 'hide' injects caret-color:transparent into
+  // the live DOM, which React then reports as a hydration mismatch and the
+  // console-error check counts as a failure. Screenshotting must not mutate the
+  // page it is measuring.
+  await page.screenshot({ path: p, fullPage: false, caret: 'initial' })
   shots.push(p)
 }
 

@@ -1,19 +1,11 @@
+import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { readSession } from '@/lib/session'
 
 export default async function HistoryPage() {
   const session = await readSession()
-  if (!session) {
-    return (
-      <div className="mx-auto max-w-md rounded-3xl card-surface px-8 py-12 text-center">
-        <h1 className="text-2xl font-extrabold text-navy-deep">Sign in to see your history</h1>
-        <Link href="/login" className="mt-6 inline-block rounded-full flame-gradient px-7 py-3 font-extrabold text-white">
-          Sign in
-        </Link>
-      </div>
-    )
-  }
+  if (!session) redirect('/login?next=%2Fhistory')
 
   const sessions = await prisma.chatSession.findMany({
     where: { userId: session.uid },

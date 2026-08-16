@@ -3,23 +3,35 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { requireAdmin } from '@/lib/admin'
+import { requireStaff } from '@/lib/admin'
 
 export type AdminState = { error?: string; saved?: boolean }
 
-/** Wraps an action so a non-admin gets a message instead of a stack trace. */
-async function asAdmin<T>(fn: () => Promise<T>): Promise<T | { error: string }> {
-  try {
-    await requireAdmin()
-    return await fn()
-  } catch (err) {
-    if (err instanceof Error && err.message === 'FORBIDDEN') {
-      return { error: 'You do not have permission to do that.' }
+/** Turns a thrown FORBIDDEN into a message instead of a stack trace. */
+function guard(gate: () => Promise<unknown>) {
+  return async function run<T>(fn: () => Promise<T>): Promise<T | { error: string }> {
+    try {
+      await gate()
+      return await fn()
+    } catch (err) {
+      if (err instanceof Error && err.message === 'FORBIDDEN') {
+        return { error: 'You do not have permission to do that.' }
+      }
+      // A duplicate slug or index is a user mistake, not a server fault.
+      if (err instanceof Error && err.message.includes('Unique constraint')) {
+        return { error: 'Something with that name or position already exists.' }
+      }
+      console.error('[admin]', err)
+      return { error: 'That did not work. Please try again.' }
     }
-    console.error('[admin]', err)
-    return { error: 'That did not work. Please try again.' }
   }
 }
+
+/**
+ * Everything in this file is teaching content, so it is staff-gated. Catalog
+ * structure and roles are admin-gated and live in catalog-actions.ts.
+ */
+const asStaff = guard(requireStaff)
 
 // ------------------------------------------------------------------- chapters
 
@@ -32,7 +44,7 @@ const ChapterInput = z.object({
 })
 
 export async function saveChapter(_prev: AdminState, formData: FormData): Promise<AdminState> {
-  return (await asAdmin(async () => {
+  return (await asStaff(async () => {
     const id = String(formData.get('id') ?? '')
     const parsed = ChapterInput.safeParse({
       courseId: formData.get('courseId'),
@@ -63,7 +75,7 @@ export async function saveChapter(_prev: AdminState, formData: FormData): Promis
 }
 
 export async function deleteChapter(formData: FormData) {
-  await asAdmin(async () => {
+  await asStaff(async () => {
     const id = String(formData.get('id') ?? '')
     const chapter = await prisma.chapter.findUnique({ where: { id } })
     if (!chapter) return {}
@@ -89,7 +101,7 @@ const TopicInput = z.object({
 })
 
 export async function saveTopic(_prev: AdminState, formData: FormData): Promise<AdminState> {
-  return (await asAdmin(async () => {
+  return (await asStaff(async () => {
     const id = String(formData.get('id') ?? '')
     const parsed = TopicInput.safeParse({
       chapterId: formData.get('chapterId'),
@@ -118,7 +130,7 @@ export async function saveTopic(_prev: AdminState, formData: FormData): Promise<
 }
 
 export async function deleteTopic(formData: FormData) {
-  await asAdmin(async () => {
+  await asStaff(async () => {
     const id = String(formData.get('id') ?? '')
     const topic = await prisma.topic.findUnique({ where: { id } })
     if (!topic) return {}
@@ -141,7 +153,7 @@ const QuestionInput = z.object({
 })
 
 export async function saveQuestion(_prev: AdminState, formData: FormData): Promise<AdminState> {
-  return (await asAdmin(async () => {
+  return (await asStaff(async () => {
     const id = String(formData.get('id') ?? '')
     const parsed = QuestionInput.safeParse({
       chapterId: formData.get('chapterId'),
@@ -188,7 +200,7 @@ export async function saveQuestion(_prev: AdminState, formData: FormData): Promi
 }
 
 export async function deleteQuestion(formData: FormData) {
-  await asAdmin(async () => {
+  await asStaff(async () => {
     const id = String(formData.get('id') ?? '')
     const question = await prisma.question.findUnique({ where: { id } })
     if (!question) return {}

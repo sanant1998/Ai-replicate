@@ -17,6 +17,9 @@ datasource db {
 enum Role {
   STUDENT
   PARENT
+  /// Authors content: courses, chapters, topics and exam questions. Cannot
+  /// change the catalog structure (classes, subjects) or anyone's role.
+  TEACHER
   ADMIN
 }
 
@@ -290,6 +293,15 @@ model User {
   /// When the account holder confirmed parent/guardian permission. Null for
   /// accounts created before the consent gate existed.
   consentAcceptedAt DateTime?
+  /// When the address was proved reachable by following a mailed link. Null
+  /// means unverified — the account works, but with a reduced credit cap and a
+  /// banner, so a typo'd or borrowed address cannot farm the free allowance.
+  emailVerifiedAt   DateTime?
+  /// Bumped to invalidate every session token already issued for this user.
+  /// Session cookies carry the value they were signed with, so a mismatch on
+  /// the next request logs the holder out — that is what makes "sign out
+  /// everywhere", and the sign-out implied by a password reset, actually work.
+  tokenVersion      Int      @default(0)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -301,6 +313,7 @@ model User {
   credits       CreditLedger[]
   payments      Payment[]
   resetTokens   PasswordResetToken[]
+  verifyTokens  EmailVerificationToken[]
   quizAttempts  QuizAttempt[]
   notes         Note[]
   bookmarks     Bookmark[]
@@ -311,6 +324,21 @@ model User {
 /// Single-use, time-limited password reset. Only the hash is stored, so a leaked
 /// database row cannot be replayed as a reset link.
 model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Single-use, time-limited email confirmation. Stored and compared exactly like
+/// PasswordResetToken — only the hash is kept, so a leaked row is not a link.
+model EmailVerificationToken {
   id        String    @id @default(cuid())
   userId    String
   tokenHash String    @unique
@@ -365,6 +393,11 @@ model Payment {
   /// Set once a subscription has been granted for this payment.
   subscriptionId    String? @unique
   failureReason     String?
+  /// Set when the provider tells us the money went back. The subscription this
+  /// payment bought is cancelled at the same moment — otherwise a refunded
+  /// student keeps the full year of access they no longer paid for.
+  refundedAt        DateTime?
+  refundedPaise     Int?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 

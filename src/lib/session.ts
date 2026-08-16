@@ -13,9 +13,20 @@ function secret() {
 }
 
 export type SessionPayload = { uid: string; email: string }
+/** What is actually inside the cookie: the payload plus the token version. */
+export type Session = SessionPayload & { tv: number }
 
 export async function createSession(payload: SessionPayload) {
-  const token = await new SignJWT({ ...payload })
+  // The account's current token version is stamped into the cookie so
+  // revokeAllSessions() can invalidate every cookie minted before it. Read here
+  // rather than passed in, so a caller cannot forget and silently break
+  // revocation.
+  const account = await prisma.user.findUnique({
+    where: { id: payload.uid },
+    select: { tokenVersion: true },
+  })
+
+  const token = await new SignJWT({ ...payload, tv: account?.tokenVersion ?? 0 })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(`${MAX_AGE}s`)
@@ -36,13 +47,19 @@ export async function destroySession() {
   jar.delete(COOKIE)
 }
 
-export async function readSession(): Promise<SessionPayload | null> {
+export async function readSession(): Promise<Session | null> {
   const jar = await cookies()
   const token = jar.get(COOKIE)?.value
   if (!token) return null
   try {
     const { payload } = await jwtVerify(token, secret())
-    return { uid: String(payload.uid), email: String(payload.email) }
+    // Cookies minted before token versioning carry no `tv`; treat them as 0,
+    // which is the column default, so existing sessions keep working.
+    return {
+      uid: String(payload.uid),
+      email: String(payload.email),
+      tv: Number(payload.tv ?? 0),
+    }
   } catch {
     return null
   }
@@ -52,9 +69,24 @@ export async function readSession(): Promise<SessionPayload | null> {
 export async function currentUser() {
   const s = await readSession()
   if (!s) return null
-  return prisma.user.findUnique({
+  const user = await prisma.user.findUnique({
     where: { id: s.uid },
     include: { board: true, classLevel: true },
+  })
+  // A cookie issued before the last revocation is no longer a valid session,
+  // even though its signature and expiry still check out.
+  if (!user || user.tokenVersion !== s.tv) return null
+  return user
+}
+
+/**
+ * Invalidates every session for an account by moving its token version on.
+ * Used after a password reset: whoever else held a cookie loses it.
+ */
+export async function revokeAllSessions(userId: string) {
+  await prisma.user.update({
+    where: { id: userId },
+    data: { tokenVersion: { increment: 1 } },
   })
 }
 

@@ -29,7 +29,7 @@ export async function startAttempt(_prev: QuizState, formData: FormData): Promis
   }
   const chapterId = String(formData.get('chapterId') ?? '')
 
-  const burst = hit(`quiz:start:${user.id}`, 20, 60_000)
+  const burst = await hit(`quiz:start:${user.id}`, 20, 60_000)
   if (!burst.ok) return { error: 'Slow down a moment and try again.' }
 
   const chapter = await assertChapterAccess(user.id, chapterId)

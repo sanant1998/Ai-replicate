@@ -10,7 +10,7 @@ Everything below works end to end:
 | Video lecture player | `/learn/[topicId]` — HLS playback through signed, expiring, account-bound tickets; resume position; completion |
 | AI tutor | `/tutor` — streaming chat scoped to your chapter, or `?mode=career` for career guidance |
 | Chapter quizzes | `/quiz/[chapterId]` — server-side marking, weighted marks, explanations revealed only after submitting |
-| Study tools | `/tools` — AI formula sheet, practice generator, doubt solver; one credit each |
+| Study tools | `/tools` — science text editor, graphing & scientific calculators, Ketcher structure editor, periodic table, matrix calculator; all client-side and free |
 | Notes & bookmarks | `/notes` — timestamped notes that jump back into the video, saved chapters |
 | Auth, subscriptions, paywall, credits | `/login`, `/checkout`, `/profile` — board/class selection, password reset, Razorpay checkout, daily AI credits |
 | Content admin | `/admin` — CRUD for chapters, topics and quiz questions, gated on the `ADMIN` role |
@@ -51,14 +51,14 @@ src/
       learn/[topicId]/      # video player + playlist + notes
       tutor/                # AI tutor chat (chapter-scoped or career mode)
       quiz/[chapterId]/     # attempt, submit, marked result
-      tools/                # formula sheet / practice / doubt solver
+      tools/                # six in-browser tools; tools/ holds one panel each
       notes/                # notes + saved chapters
       checkout/             # Razorpay order creation (server action)
       admin/                # ADMIN-only CRUD for chapters, topics, questions
       performance/ history/ profile/ terms/ privacy/ pricing/
     api/
       progress/route.ts     # POST watch position, re-checks entitlement
-      tutor/route.ts        # SSE stream from Anthropic, spends a credit
+      tutor/route.ts        # SSE stream from OpenAI, spends a credit
       video/[topicId]/      # verifies a playback ticket, 302s to the CDN
       payments/razorpay/webhook/   # the ONLY path that grants a subscription
     login/                  # credentials auth (server actions)
@@ -80,7 +80,7 @@ prisma/
   seed.ts                   # catalog + demo accounts
   questions.ts              # hand-written chapter quizzes
   syllabus.ts               # NCERT chapter listings for classes 6, 7, 9, 10
-scripts/                    # browser suites, payment suite, mock Anthropic server
+scripts/                    # browser suites, payment suite, mock OpenAI server
 ```
 
 ### The three rules that govern access
@@ -115,11 +115,11 @@ The baseline migration in `prisma/migrations/` is hand-authored rather than gene
 
 Three layers, each re-checked server-side on every request:
 
-1. **Entitlement** — `src/lib/access.ts` is the only source of truth. The player, `/api/progress`, `/api/tutor`, `/api/video`, the quiz and the tools all call it. A forged id gets a 403, not content.
+1. **Entitlement** — `src/lib/access.ts` is the only source of truth. The player, `/api/progress`, `/api/tutor`, `/api/video` and the quiz all call it. A forged id gets a 403, not content. (`/tools` is exempt by design: it needs a session, but the tools run wholly in the browser and expose no chapter content.)
 2. **Playback tickets** — `src/lib/video.ts` signs `{topicId, userId, expiry}` with `AUTH_SECRET`. The player never receives a CDN URL; it plays through `/api/video/[topicId]`, which verifies the ticket *and* re-checks entitlement, so a lapsed subscription cuts playback mid-session. Tickets expire in 4 hours and are bound to the account they were issued to.
 3. **Payment** — `src/lib/entitle.ts` is the only place a `Subscription` is created, and it is called only from the signature-verified Razorpay webhook. The `Payment` row owns the subscription through a unique `subscriptionId`, so a retried webhook grants exactly once.
 
-Rate limits sit on the tutor, progress, video, tools, login, signup and password-reset paths (`src/lib/rate-limit.ts`). The store is per-process; swap `hit()` for a Redis `INCR`/`EXPIRE` before running more than one instance.
+Rate limits sit on the tutor, progress, video, login, signup and password-reset paths (`src/lib/rate-limit.ts`). The store is per-process; swap `hit()` for a Redis `INCR`/`EXPIRE` before running more than one instance.
 
 ---
 
@@ -130,7 +130,8 @@ Rate limits sit on the tutor, progress, video, tools, login, signup and password
 - **Wire an email provider.** `src/lib/email.ts` uses Resend if `RESEND_API_KEY` is set, and otherwise logs the reset link to the server console. Password reset does not work for real users until this is set.
 - **Content is partly real.** Class 8 CBSE has full chapter and topic data. Classes 6, 7, 9 and 10 carry real NCERT chapter names but placeholder topics and no video. Classes 5, 11 and 12 are empty shells. NCERT rationalised the syllabus from 2023–24 — check `prisma/syllabus.ts` against the edition your students use.
 - **Have a lawyer read `/terms` and `/privacy`.** They describe what the app actually does, which is the right starting point, but your users are minors: a signup checkbox is very likely not "verifiable parental consent" under the DPDP Act 2023.
-- **Only 29 quiz questions exist**, across 6 chapters. Write more in `/admin`, or lean on the practice generator in `/tools`.
+- **Only 29 quiz questions exist**, across 6 chapters. Write more in `/admin`.
+- **Ketcher is a heavy dependency.** `ketcher-react` plus its WebAssembly chemistry engine is several megabytes. It is loaded with `next/dynamic` and `ssr: false`, so it only downloads when a student opens that one tool — keep it that way.
 
 ---
 
@@ -140,18 +141,25 @@ Rate limits sit on the tutor, progress, video, tools, login, signup and password
 npm run build && npm start                              # terminal 1
 npx playwright install chromium                         # once
 npm run db:seed                                         # suites consume credits — reseed first
-VERIFY_BASE=http://127.0.0.1:3000 npm run verify        # 33 browser checks
+VERIFY_BASE=http://localhost:3000 npm run verify        # 33 browser checks
+VERIFY_BASE=http://localhost:3000 npm run verify:tools  # 22 checks across the six tools
 npm run verify:payments                                 # webhook signature + idempotency
+npm run verify:expression                               # unit checks for the maths parser
 ```
 
-For the tutor and tools without burning API credits:
+Use `localhost`, not `127.0.0.1` — the dev server treats the other spelling as a
+cross-origin host and blocks its own HMR resources, which shows up as 403s in the
+console-error check. `next.config.ts` allows both, but only after a restart.
+
+For the tutor without burning API credits:
 
 ```bash
-npm run mock:anthropic                                  # fake Messages endpoint on :4010
-# with ANTHROPIC_API_KEY=mock ANTHROPIC_BASE_URL=http://127.0.0.1:4010
+npm run mock:openai                                     # fake Chat Completions endpoint on :4010
+# with OPENAI_API_KEY=mock OPENAI_BASE_URL=http://127.0.0.1:4010/v1
 npm run verify:tutor
 ```
 
-The mock answers streaming and non-streaming requests, so it covers both the tutor route and the Tools pages.
+The mock answers both streaming and non-streaming requests. Note that `verify:tutor`
+asserts the mock's exact wording, so it only passes against the mock — not a real key.
 
-Browser checks cover: catalog rendering and stats, free-chapter playback while signed out, locked chapters showing the paywall, `/api/progress` returning 401 anonymously and 200 when entitled, login/logout, checkout refusing to grant when payments are unconfigured, wrong-password handling, and mobile layout overflow. Screenshots land in `.verify-shots/`.
+Browser checks cover: catalog rendering and stats, free-chapter playback while signed out, locked chapters showing the paywall, `/api/progress` returning 401 anonymously and 200 when entitled, login/logout, checkout refusing to grant when payments are unconfigured, wrong-password handling, and mobile layout overflow. `verify:tools` additionally exercises each tool for real — that `2+3*4` returns 14, that a curve is actually painted to the canvas, that `det A` is right and a shape mismatch is refused, that all 118 elements render, that KaTeX typesets the editor's maths, and that Ketcher mounts. Screenshots land in `.verify-shots/`.
