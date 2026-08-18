@@ -113,7 +113,7 @@ export function QuizRunner({
               type={q.kind === 'NUMERIC' ? 'text' : 'text'}
               inputMode={q.kind === 'NUMERIC' ? 'decimal' : 'text'}
               placeholder={q.kind === 'NUMERIC' ? 'Your answer, as a number' : 'Your answer'}
-              className="mt-3 w-full rounded-xl border border-navy/15 bg-white px-3.5 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber"
+              className="mt-3 w-full rounded-xl border border-navy/15 bg-surface px-3.5 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber"
             />
           )}
         </fieldset>

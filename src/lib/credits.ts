@@ -20,7 +20,14 @@ function utcMidnight(d = new Date()) {
 export const UNVERIFIED_CREDIT_CAP = 2
 
 /** The allowance a free account is created with (schema default on User). */
-const FREE_CREDIT_CAP = 5
+export const FREE_CREDIT_CAP = 5
+
+/**
+ * The allowance a class bundle buys. Exported so `grantForPayment` and
+ * `revokeForPayment` raise and lower it against the same number this file uses
+ * to decide whether an account has paid.
+ */
+export const BUNDLE_CREDIT_CAP = 50
 
 /**
  * The cap actually applied today, after the verification discount.

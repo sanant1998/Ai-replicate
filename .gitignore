@@ -14,7 +14,10 @@
 /coverage
 
 # next.js
+# Not just the root: a shifted workspace root writes .next into a
+# subdirectory, and those bundles must never be committed either.
 /.next/
+**/.next/
 /out/
 
 # production

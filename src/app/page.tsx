@@ -15,7 +15,7 @@ import {
 } from '@/components/icons'
 
 export const metadata = {
-  title: 'PaperPath — chapter-wise video lessons for CBSE, ICSE & state boards',
+  title: 'PaperPath — chapter-wise video lessons for the CBSE syllabus',
   description:
     'Chapter-wise video lectures, an AI tutor that knows the chapter you are on, and quizzes that mark themselves. Chapter 1 of every subject is free.',
 }
@@ -97,7 +97,7 @@ export default async function LandingPage() {
           </Link>
           <Link
             href="/login"
-            className="rounded-full bg-white px-4 py-2 text-sm font-extrabold text-navy-deep shadow-sm transition hover:shadow"
+            className="rounded-full bg-surface px-4 py-2 text-sm font-extrabold text-navy-deep shadow-sm transition hover:shadow"
           >
             Sign in
           </Link>
@@ -107,7 +107,7 @@ export default async function LandingPage() {
       {/* --------------------------------------------------------------- hero */}
       <section className="mx-auto w-full max-w-6xl px-5 pb-14">
         <div className="hero-surface relative overflow-hidden rounded-[2rem] px-6 py-10 sm:px-10 sm:py-12">
-          <div className="pointer-events-none absolute -right-24 -top-28 size-80 rounded-full bg-white/45 blur-3xl" />
+          <div className="pointer-events-none absolute -right-24 -top-28 size-80 rounded-full bg-surface/45 blur-3xl" />
 
           <div className="relative grid items-start gap-10 lg:grid-cols-[1.15fr_minmax(0,26rem)]">
             <div>
@@ -154,7 +154,7 @@ export default async function LandingPage() {
                       <li key={ch.id}>
                         <Link
                           href={`/academic?class=${featured?.slug}`}
-                          className="inline-flex items-center gap-2 rounded-full border border-navy/12 bg-white/80 px-4 py-2 text-sm font-bold text-navy-deep transition hover:border-amber"
+                          className="inline-flex items-center gap-2 rounded-full border border-navy/12 bg-surface/80 px-4 py-2 text-sm font-bold text-navy-deep transition hover:border-amber"
                         >
                           <IconPlay className="size-3.5 text-moss" />
                           {ch.subject} · {ch.title}
@@ -264,7 +264,7 @@ export default async function LandingPage() {
               </ul>
               <a
                 href="#join"
-                className="mt-6 inline-block rounded-2xl border border-navy/15 bg-white px-6 py-3 font-extrabold text-navy-deep transition hover:border-amber"
+                className="mt-6 inline-block rounded-2xl border border-navy/15 bg-surface px-6 py-3 font-extrabold text-navy-deep transition hover:border-amber"
               >
                 Create a free account
               </a>

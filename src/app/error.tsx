@@ -37,7 +37,7 @@ export default function Error({
         </button>
         <Link
           href="/academic"
-          className="min-h-11 rounded-full border border-navy/15 bg-white px-7 py-3 font-extrabold text-navy/65 transition hover:border-amber"
+          className="min-h-11 rounded-full border border-navy/15 bg-surface px-7 py-3 font-extrabold text-navy/65 transition hover:border-amber"
         >
           Back to courses
         </Link>

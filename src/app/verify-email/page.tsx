@@ -68,7 +68,7 @@ export default async function VerifyEmailPage(props: PageProps<'/verify-email'>)
         {!userId && (
           <Link
             href="/profile"
-            className="min-h-11 rounded-xl border border-navy/15 bg-white px-5 py-3 font-extrabold text-navy/65 transition hover:border-amber"
+            className="min-h-11 rounded-xl border border-navy/15 bg-surface px-5 py-3 font-extrabold text-navy/65 transition hover:border-amber"
           >
             Send a new link
           </Link>

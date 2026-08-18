@@ -95,6 +95,31 @@ export async function sendEmailVerification(to: string, verifyUrl: string) {
   })
 }
 
+/**
+ * The consent request a child's signup sends to the address they gave for a
+ * parent. Written to be read by an adult who was not there when the account was
+ * created, so it says what the service is before it asks for anything.
+ */
+export async function sendGuardianConsent(
+  to: string,
+  childName: string,
+  consentUrl: string,
+) {
+  await deliver({
+    to,
+    subject: `${childName} has signed up for PaperPath — your permission is needed`,
+    text: [
+      `${childName} created an account on PaperPath, a chapter-wise video learning site for Indian school syllabuses, and gave this address as their parent or guardian.`,
+      '',
+      'PaperPath keeps their name, email, board and class, what they have watched, their quiz scores and notes, and their conversations with the AI tutor.',
+      '',
+      `Confirm you are happy for them to use it — and see exactly what is stored — here:\n${consentUrl}`,
+      '',
+      'The link works for 14 days. If you do not recognise this, ignore this email and reply to tell us; the account will be closed.',
+    ].join('\n'),
+  })
+}
+
 export async function sendPasswordReset(to: string, resetUrl: string) {
   await deliver({
     to,

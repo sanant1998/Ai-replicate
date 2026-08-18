@@ -379,7 +379,7 @@ export function GraphingCalculator({ onClose }: { onClose: () => void }) {
                   },
                 ])
               }
-              className="min-h-11 flex-1 rounded-xl bg-navy text-sm font-extrabold text-white transition hover:brightness-110"
+              className="min-h-11 flex-1 rounded-xl bg-navy-solid text-sm font-extrabold text-white transition hover:brightness-110"
             >
               + Add
             </button>
@@ -488,7 +488,7 @@ export function GraphingCalculator({ onClose }: { onClose: () => void }) {
         <button
           type="button"
           onClick={downloadPng}
-          className={`${toolbarButton} bg-navy text-white`}
+          className={`${toolbarButton} bg-navy-solid text-white`}
           style={{ border: '1px solid transparent' }}
         >
           <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">

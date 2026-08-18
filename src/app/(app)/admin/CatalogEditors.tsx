@@ -2,9 +2,11 @@
 
 import { useActionState, useState, type ReactNode } from 'react'
 import {
+  deleteBoard,
   deleteClassLevel,
   deleteCourse,
   deleteSubject,
+  saveBoard,
   saveClassLevel,
   saveCourse,
   saveSubject,
@@ -15,7 +17,7 @@ import type { AdminState } from './actions'
 const initial: AdminState = {}
 
 const field =
-  'min-h-10 w-full rounded-xl border border-navy/15 bg-white px-3 font-semibold text-navy-deep outline-none transition focus:border-amber'
+  'min-h-10 w-full rounded-xl border border-navy/15 bg-surface px-3 font-semibold text-navy-deep outline-none transition focus:border-amber'
 const label = 'mb-1 block text-xs font-bold uppercase tracking-wide text-navy/45'
 
 function Field({ children, name }: { children: ReactNode; name: string }) {
@@ -67,6 +69,63 @@ function AddPanel({ title, children }: { title: string; children: ReactNode }) {
       </button>
       {open && <div className="mt-3">{children}</div>}
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------- boards
+
+export function BoardForm({ existing }: { existing?: { id: string; code: string; name: string } }) {
+  const [state, action] = useActionState(saveBoard, initial)
+  return (
+    <form action={action} className="space-y-3">
+      {existing && <input type="hidden" name="id" value={existing.id} />}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field name="Code">
+          <input
+            name="code"
+            defaultValue={existing?.code}
+            placeholder="ICSE"
+            className={field}
+            required
+          />
+        </Field>
+        <Field name="Name">
+          <input
+            name="name"
+            defaultValue={existing?.name}
+            placeholder="Indian Certificate of Secondary Education"
+            className={field}
+            required
+          />
+        </Field>
+      </div>
+      <Feedback state={state} />
+      <Submit>{existing ? 'Save board' : 'Create board'}</Submit>
+    </form>
+  )
+}
+
+export function AddBoard() {
+  return (
+    <AddPanel title="New board">
+      <BoardForm />
+    </AddPanel>
+  )
+}
+
+export function DeleteBoard({ id, blocked }: { id: string; blocked: string | null }) {
+  return (
+    <form action={deleteBoard}>
+      <input type="hidden" name="id" value={id} />
+      <button
+        type="submit"
+        disabled={Boolean(blocked)}
+        title={blocked ?? 'Delete this board'}
+        className="rounded-lg border border-navy/15 px-2.5 py-1 text-xs font-bold text-navy/50 transition enabled:hover:border-ember enabled:hover:text-ember disabled:opacity-35"
+      >
+        Delete
+      </button>
+    </form>
   )
 }
 
@@ -209,10 +268,10 @@ export function SubjectForm({
           <input name="sortKey" type="number" min={0} defaultValue={existing?.sortKey ?? 0} className={field} />
         </Field>
         <Field name="Colour from">
-          <input name="colorFrom" type="color" defaultValue={existing?.colorFrom ?? '#3B82F6'} className="h-10 w-full rounded-xl border border-navy/15 bg-white p-1" />
+          <input name="colorFrom" type="color" defaultValue={existing?.colorFrom ?? '#3B82F6'} className="h-10 w-full rounded-xl border border-navy/15 bg-surface p-1" />
         </Field>
         <Field name="Colour to">
-          <input name="colorTo" type="color" defaultValue={existing?.colorTo ?? '#2C5282'} className="h-10 w-full rounded-xl border border-navy/15 bg-white p-1" />
+          <input name="colorTo" type="color" defaultValue={existing?.colorTo ?? '#2C5282'} className="h-10 w-full rounded-xl border border-navy/15 bg-surface p-1" />
         </Field>
       </div>
       <Feedback state={state} />
@@ -346,7 +405,7 @@ export function RolePicker({
         defaultValue={role}
         disabled={Boolean(disabled)}
         title={disabled ?? undefined}
-        className="min-h-9 rounded-lg border border-navy/15 bg-white px-2 text-sm font-bold text-navy-deep disabled:opacity-45"
+        className="min-h-9 rounded-lg border border-navy/15 bg-surface px-2 text-sm font-bold text-navy-deep disabled:opacity-45"
       >
         <option value="STUDENT">Student</option>
         <option value="TEACHER">Teacher</option>

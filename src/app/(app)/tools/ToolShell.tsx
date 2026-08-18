@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { resolveTheme } from '@/components/ThemeToggle'
 import clsx from 'clsx'
 
 export type ShellTab = { id: string; label: string; icon: ReactNode }
@@ -63,7 +64,11 @@ export function ToolShell({
   onClose,
   children,
 }: Props) {
-  const [dark, setDark] = useState(false)
+  // Opens in whatever theme the app is in, then keeps its own state — the
+  // header toggle is a local override for this panel, not a second global
+  // setting. Before the app had a theme this was hard-coded to light, which now
+  // would mean opening a white panel over a dark page.
+  const [dark, setDark] = useState(() => resolveTheme() === 'dark')
   const rootRef = useRef<HTMLDivElement>(null)
 
   // Escape closes, and the page behind must not scroll while the overlay is up.

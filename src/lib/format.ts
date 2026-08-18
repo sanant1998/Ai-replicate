@@ -29,3 +29,20 @@ export function formatPaise(paise: number): string {
     maximumFractionDigits: 0,
   }).format(paise / 100)
 }
+
+/**
+ * 2700000 -> "₹27,000.00"
+ *
+ * Prices on the catalog are whole rupees and read better without the decimals,
+ * but a receipt is a document someone reconciles against a bank statement — and
+ * a tax split of a round total almost never lands on a whole rupee. Rounding it
+ * away there would make the lines stop adding up.
+ */
+export function formatPaiseExact(paise: number): string {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(paise / 100)
+}

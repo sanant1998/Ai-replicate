@@ -1,0 +1,76 @@
+{
+  "_source": "https://brightmindtutors.com/hardest-aqa-a-level-chemistry-questions-of-all-time/",
+  "_note": "Imported with `npm run db:import-topic prisma/topics/aqa-a-level-chemistry.json`. The answer key is the source of truth: importing replaces it. Chapter index 90+ is the convention for imported content, so it cannot collide with a syllabus chapter.",
+  "subjectSlug": "chemistry",
+  "classSlug": "class-11",
+  "chapter": {
+    "index": 90,
+    "title": "Hardest AQA A-Level Chemistry Questions",
+    "isFree": true,
+    "summary": "Five past-paper calculations, each with its full worked solution."
+  },
+  "topic": {
+    "index": 1,
+    "title": "Five Hardest Calculations",
+    "kind": "ACTIVITY"
+  },
+  "content": "HARDEST AQA A-LEVEL CHEMISTRY QUESTIONS — five past-paper calculations with full worked solutions.\n\n=== 1. TIME-OF-FLIGHT MASS SPECTROMETRY ===\n\nA molecule Q is ionised by electron impact in a TOF mass spectrometer. The Q+ ion has a kinetic energy of $2.09 \\times 10^{-15}$ J. This ion takes $1.23 \\times 10^{-5}$ s to reach the detector. The length of the flight tube is 1.50 m. Calculate the relative molecular mass of Q.\n\nWorked solution:\n1. Velocity from the flight tube: $v = d/t = 1.50 / (1.23 \\times 10^{-5}) = 1.22 \\times 10^{5}$ m s$^{-1}$.\n2. Rearrange kinetic energy $KE = \\tfrac{1}{2}mv^2$ for mass: $m = 2KE/v^2 = 2.8 \\times 10^{-25}$ kg.\n3. Multiply by the Avogadro constant for the mass of one mole: $2.8 \\times 10^{-25} \\times 6.022 \\times 10^{23} = 0.169$ kg mol$^{-1}$.\n4. Answer: $M_r = 169$ g mol$^{-1}$.\n\n=== 2. BUFFER SOLUTION pH AFTER ADDING KOH ===\n\nA buffer contains 0.0136 mol of the salt KX and 100 cm3 of 0.500 mol dm$^{-3}$ HX. Calculate the pH after $3.00 \\times 10^{-4}$ mol of KOH is added. $K_a = 1.41 \\times 10^{-5}$ mol dm$^{-3}$.\n\nWorked solution:\n1. The added base reacts: KOH + HX -> KX + H2O. Every mole of KOH removes a mole of acid and makes a mole of salt.\n2. Acid left: $0.05 - 3.00 \\times 10^{-4} = 0.0497$ mol. Salt now: $0.0136 + 3.00 \\times 10^{-4} = 0.0139$ mol.\n3. In the buffer expression $[H^+] = K_a \\times \\text{moles acid} / \\text{moles salt}$, the shared volume cancels, so moles may be used directly: $[H^+] = 5.04 \\times 10^{-5}$ mol dm$^{-3}$.\n4. Answer: pH = 4.30.\n\n=== 3. ETHANEDIOATE MIXTURE — TWO TITRATIONS ===\n\nA white solid is a mixture of sodium ethanedioate (Na2C2O4), ethanedioic acid dihydrate (H2C2O4.2H2O) and an inert solid. Using a permanganate titration and a sodium hydroxide titration, calculate the percentage by mass of sodium ethanedioate.\n\nWorked solution:\n1. The permanganate titration oxidises every ethanedioate ion, whatever it came from: total $C_2O_4^{2-} = 1.325 \\times 10^{-3}$ mol.\n2. The sodium hydroxide titration neutralises only the acid: $H_2C_2O_4 = 5.225 \\times 10^{-4}$ mol.\n3. The difference is the ethanedioate that came from the salt: $1.325 \\times 10^{-3} - 5.225 \\times 10^{-4} = 8.025 \\times 10^{-4}$ mol in the 25 cm3 portion.\n4. Scale to the 250 cm3 the sample was made up to: $8.025 \\times 10^{-3}$ mol.\n5. Mass of Na2C2O4 ($M_r = 134$): $8.025 \\times 10^{-3} \\times 134 = 1.075$ g.\n6. Answer: 56.6% by mass.\n\n=== 4. HYDROGEN PEROXIDE IN HAIR BLEACH ===\n\nA sample of hair bleach solution is diluted with water. The concentration of hydrogen peroxide in the diluted solution is 5.00% of that in the original solution. 35.85 cm3 of 0.0200 mol dm$^{-3}$ potassium manganate(VII) is needed in the titration. Calculate the concentration of hydrogen peroxide in the original bleach.\n\nWorked solution:\n1. Ionic equation: $2MnO_4^- + 6H^+ + 5H_2O_2 \\rightarrow 2Mn^{2+} + 8H_2O + 5O_2$. The ratio is 2 manganate to 5 peroxide.\n2. Moles of KMnO4: $0.0200 \\times 0.03585 = 7.17 \\times 10^{-4}$ mol.\n3. Moles of H2O2: $\\tfrac{5}{2} \\times 7.17 \\times 10^{-4} = 1.793 \\times 10^{-3}$ mol.\n4. Concentration in the diluted solution: 0.0717 mol dm$^{-3}$.\n5. The dilution was to 5.00%, so multiply by 20.\n6. Answer: 1.43 mol dm$^{-3}$ in the original bleach.\n\n=== 5. pH OF SATURATED CALCIUM HYDROXIDE ===\n\n100 cm3 of 0.100 mol dm$^{-3}$ hydrochloric acid is added to 0.600 g of calcium hydroxide, leaving a saturated solution. The solubility of Ca(OH)2 is 0.400 g dm$^{-3}$ and $K_w = 6.80 \\times 10^{-15}$ mol2 dm$^{-6}$. Calculate the pH.\n\nWorked solution:\n1. A saturated solution sets the concentration, so the excess solid is irrelevant: $[Ca(OH)_2] = 0.400/74 = 0.00540$ mol dm$^{-3}$.\n2. Each formula unit releases two hydroxide ions: $[OH^-] = 2 \\times 0.00540 = 0.0108$ mol dm$^{-3}$.\n3. From the ionic product of water: $[H^+] = K_w/[OH^-] = 6.80 \\times 10^{-15}/0.0108 = 6.30 \\times 10^{-13}$ mol dm$^{-3}$.\n4. Answer: pH = 12.2.\n",
+  "answers": [
+    {
+      "index": 1,
+      "question": "A molecule Q is ionised by electron impact in a TOF mass spectrometer. The Q+ ion has a kinetic energy of 2.09 x 10^-15 J and takes 1.23 x 10^-5 s to reach the detector. The flight tube is 1.50 m long. Calculate the relative molecular mass of Q.",
+      "answer": "$M_r = 169$ g mol$^{-1}$",
+      "steps": [
+        "The flight tube gives you a distance and a time, so start with speed: $v = d/t = 1.50 / (1.23 \\times 10^{-5}) = 1.22 \\times 10^{5}$ m s$^{-1}$.",
+        "You now know the kinetic energy and the speed, so rearrange $KE = \\tfrac{1}{2}mv^2$ for mass: $m = 2KE/v^2 = 2.8 \\times 10^{-25}$ kg. That is the mass of one ion.",
+        "Multiply by the Avogadro constant to get the mass of a mole: $2.8 \\times 10^{-25} \\times 6.022 \\times 10^{23} = 0.169$ kg mol$^{-1}$.",
+        "Convert kg to g: $0.169$ kg mol$^{-1}$ is 169 g mol$^{-1}$, so $M_r = 169$."
+      ]
+    },
+    {
+      "index": 2,
+      "question": "A buffer contains 0.0136 mol KX and 100 cm3 of 0.500 mol dm^-3 HX. Calculate the pH after adding 3.00 x 10^-4 mol KOH. Ka = 1.41 x 10^-5 mol dm^-3.",
+      "answer": "pH = 4.30",
+      "steps": [
+        "Write what the added base does: KOH + HX $\\rightarrow$ KX + H2O. Each mole of KOH turns a mole of acid into a mole of salt.",
+        "Acid left: $0.05 - 3.00 \\times 10^{-4} = 0.0497$ mol. Salt now: $0.0136 + 3.00 \\times 10^{-4} = 0.0139$ mol.",
+        "Both sit in the same solution, so the volume cancels and you can put moles straight into $[H^+] = K_a \\times \\text{acid}/\\text{salt}$: $[H^+] = 5.04 \\times 10^{-5}$ mol dm$^{-3}$.",
+        "Take the negative logarithm: $pH = -\\log(5.04 \\times 10^{-5}) = 4.30$."
+      ]
+    },
+    {
+      "index": 3,
+      "question": "A white solid is a mixture of sodium ethanedioate, ethanedioic acid dihydrate and an inert solid. Using a permanganate titration and a sodium hydroxide titration, calculate the percentage by mass of sodium ethanedioate.",
+      "answer": "56.6% by mass",
+      "steps": [
+        "Work out what each titration is measuring. Permanganate oxidises every ethanedioate ion in the sample, whichever compound it came from: total $C_2O_4^{2-} = 1.325 \\times 10^{-3}$ mol.",
+        "Sodium hydroxide neutralises only the acid, so that titration counts the ethanedioic acid alone: $5.225 \\times 10^{-4}$ mol.",
+        "Subtract: the ethanedioate that did not come from the acid came from the salt. $1.325 \\times 10^{-3} - 5.225 \\times 10^{-4} = 8.025 \\times 10^{-4}$ mol in the 25 cm3 portion.",
+        "Scale up to the 250 cm3 the sample was made up to: $8.025 \\times 10^{-3}$ mol.",
+        "Turn moles into mass using $M_r = 134$: $8.025 \\times 10^{-3} \\times 134 = 1.075$ g, which is 56.6% of the sample."
+      ]
+    },
+    {
+      "index": 4,
+      "question": "Hair bleach is diluted so the hydrogen peroxide concentration is 5.00% of the original. The diluted solution needs 35.85 cm3 of 0.0200 mol dm^-3 potassium manganate(VII). Calculate the concentration of hydrogen peroxide in the original bleach.",
+      "answer": "1.43 mol dm$^{-3}$",
+      "steps": [
+        "Get the ratio from the ionic equation: $2MnO_4^- + 6H^+ + 5H_2O_2 \\rightarrow 2Mn^{2+} + 8H_2O + 5O_2$, so 2 manganate react with 5 peroxide.",
+        "Moles of manganate used: $0.0200 \\times 0.03585 = 7.17 \\times 10^{-4}$ mol.",
+        "Apply the ratio: moles of H2O2 $= \\tfrac{5}{2} \\times 7.17 \\times 10^{-4} = 1.793 \\times 10^{-3}$ mol, giving 0.0717 mol dm$^{-3}$ in the diluted solution.",
+        "The diluted solution is 5.00% of the original, so multiply by 20: $0.0717 \\times 20 = 1.43$ mol dm$^{-3}$."
+      ]
+    },
+    {
+      "index": 5,
+      "question": "100 cm3 of 0.100 mol dm^-3 HCl is added to 0.600 g of calcium hydroxide, leaving a saturated solution. Solubility of Ca(OH)2 is 0.400 g dm^-3 and Kw = 6.80 x 10^-15. Calculate the pH.",
+      "answer": "pH = 12.2",
+      "steps": [
+        "The solution is saturated, so its concentration is fixed by the solubility and the leftover solid does not matter: $[Ca(OH)_2] = 0.400/74 = 0.00540$ mol dm$^{-3}$.",
+        "Each Ca(OH)2 releases two hydroxide ions, so $[OH^-] = 2 \\times 0.00540 = 0.0108$ mol dm$^{-3}$.",
+        "Use the ionic product of water to cross over to $[H^+]$: $[H^+] = K_w/[OH^-] = 6.80 \\times 10^{-15}/0.0108 = 6.30 \\times 10^{-13}$ mol dm$^{-3}$.",
+        "Take the negative logarithm: $pH = -\\log(6.30 \\times 10^{-13}) = 12.2$."
+      ]
+    }
+  ]
+}

@@ -38,6 +38,8 @@ const asStaff = guard(requireStaff)
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const HEX = /^#[0-9a-fA-F]{6}$/
+/** CBSE, ICSE, MH, TN — short, upper-case, no spaces. */
+const BOARD_CODE = /^[A-Z][A-Z0-9-]{1,15}$/
 
 /** Forms take rupees because that is what a human types; the schema stores paise. */
 function rupeesToPaise(v: FormDataEntryValue | null): number | null {
@@ -45,6 +47,63 @@ function rupeesToPaise(v: FormDataEntryValue | null): number | null {
   if (!text) return null
   const n = Number(text)
   return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null
+}
+
+// ---------------------------------------------------------------------- boards
+
+/**
+ * Boards had no editor at all, which is why the app advertised "CBSE, ICSE and
+ * state boards" while only CBSE existed: adding one meant editing the seed,
+ * and seeding wipes every table first. ICSE was seeded with no classes under
+ * it, so it was invisible everywhere the pickers filter empty boards out.
+ */
+const BoardInput = z.object({
+  code: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(BOARD_CODE, 'Use a short upper-case code, e.g. CBSE, ICSE or MH'),
+  name: z.string().trim().min(3, 'Give the board its full name').max(120),
+})
+
+export async function saveBoard(_prev: AdminState, formData: FormData): Promise<AdminState> {
+  return (await asAdmin(async () => {
+    const id = String(formData.get('id') ?? '')
+    const parsed = BoardInput.safeParse({
+      code: formData.get('code'),
+      name: formData.get('name'),
+    })
+    if (!parsed.success) return { error: parsed.error.issues[0].message }
+
+    const clash = await prisma.board.findFirst({
+      where: { code: parsed.data.code, ...(id ? { NOT: { id } } : {}) },
+    })
+    if (clash) return { error: `A board with the code ${parsed.data.code} already exists.` }
+
+    if (id) await prisma.board.update({ where: { id }, data: parsed.data })
+    else await prisma.board.create({ data: parsed.data })
+
+    revalidatePath('/admin/catalog')
+    revalidatePath('/login')
+    revalidatePath('/profile')
+    return { saved: true }
+  })) as AdminState
+}
+
+export async function deleteBoard(formData: FormData) {
+  await asAdmin(async () => {
+    const id = String(formData.get('id') ?? '')
+    // Deleting a board cascades to its classes, and from there to every course,
+    // chapter and topic under them. Refuse while anything hangs off it.
+    const [classes, students] = await Promise.all([
+      prisma.classLevel.count({ where: { boardId: id } }),
+      prisma.user.count({ where: { boardId: id } }),
+    ])
+    if (classes > 0 || students > 0) return {}
+    await prisma.board.delete({ where: { id } })
+    revalidatePath('/admin/catalog')
+    return {}
+  })
 }
 
 // --------------------------------------------------------------------- classes
@@ -93,11 +152,15 @@ export async function deleteClassLevel(formData: FormData) {
     const id = String(formData.get('id') ?? '')
     // A delete cascades to courses, chapters and topics. Refuse while anything
     // depends on it rather than quietly destroying what someone paid for.
-    const [courses, students] = await Promise.all([
+    // Subscriptions are counted too: a bundle is scoped to the class rather
+    // than to any course under it, so a class could have no courses left and
+    // still have people holding a paid year of it.
+    const [courses, students, subscriptions] = await Promise.all([
       prisma.course.count({ where: { classLevelId: id } }),
       prisma.user.count({ where: { classLevelId: id } }),
+      prisma.subscription.count({ where: { classLevelId: id } }),
     ])
-    if (courses > 0 || students > 0) return {}
+    if (courses > 0 || students > 0 || subscriptions > 0) return {}
     await prisma.classLevel.delete({ where: { id } })
     revalidatePath('/admin/catalog')
     return {}

@@ -43,6 +43,11 @@ const CHECKS: Check[] = [
     why: '/api/cron/maintenance refuses to run, so subscription status, abandoned checkouts and spent tokens are never tidied up',
   },
   {
+    label: 'ERROR_WEBHOOK_URL',
+    ok: () => Boolean(process.env.ERROR_WEBHOOK_URL),
+    why: 'runtime failures are written to the log and nowhere else — a webhook that has been failing for a week looks identical to one that has never fired',
+  },
+  {
     label: 'RAZORPAY_KEY_ID + RAZORPAY_KEY_SECRET + RAZORPAY_WEBHOOK_SECRET',
     ok: () =>
       Boolean(

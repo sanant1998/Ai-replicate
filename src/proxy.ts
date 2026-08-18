@@ -61,8 +61,46 @@ function csp(nonce: string, isDev: boolean) {
   ].join('; ')
 }
 
+/**
+ * The headers that are worth setting on every response, document or not.
+ *
+ * API routes used to be excluded from this file entirely, on the reasoning that
+ * there is no HTML to inject into. That is true of the CSP nonce and false of
+ * everything else: a JSON body served without `nosniff` can still be coaxed
+ * into being interpreted as something else, and `Referrer-Policy` governs what
+ * leaks out of a redirect — which /api/video/[topicId] performs on every play.
+ */
+function commonHeaders(headers: Headers, isDev: boolean) {
+  headers.set('X-Content-Type-Options', 'nosniff')
+  headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+  headers.set('X-Frame-Options', 'DENY')
+  headers.set(
+    'Permissions-Policy',
+    'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+  )
+  // Only meaningful over TLS, and actively harmful on a plain-HTTP dev server:
+  // one visit would pin localhost to https for the browser's whole cache.
+  if (!isDev) {
+    headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload')
+  }
+}
+
 export function proxy(request: NextRequest) {
   const isDev = process.env.NODE_ENV === 'development'
+
+  // JSON and SSE load nothing and frame nothing, so they get the strictest
+  // policy there is rather than the document one — and no nonce, which would
+  // otherwise force these routes to be treated as dynamic documents.
+  if (request.nextUrl.pathname.startsWith('/api/')) {
+    const response = NextResponse.next()
+    commonHeaders(response.headers, isDev)
+    response.headers.set(
+      'Content-Security-Policy',
+      "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+    )
+    return response
+  }
+
   const nonce = crypto.randomUUID().replaceAll('-', '')
   const policy = csp(nonce, isDev)
 
@@ -71,25 +109,17 @@ export function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set('x-nonce', nonce)
   requestHeaders.set('Content-Security-Policy', policy)
+  // Layouts do not receive the path they are rendering, and the app layout has
+  // to know it to keep a test account on its one screen. Set here because this
+  // is the only place that sees the request before rendering starts — and set
+  // on the request rather than the response, since that is the copy a server
+  // component reads back through headers().
+  requestHeaders.set('x-pathname', request.nextUrl.pathname)
 
   const response = NextResponse.next({ request: { headers: requestHeaders } })
 
   response.headers.set('Content-Security-Policy', policy)
-  response.headers.set('X-Content-Type-Options', 'nosniff')
-  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
-  response.headers.set('X-Frame-Options', 'DENY')
-  response.headers.set(
-    'Permissions-Policy',
-    'camera=(), microphone=(), geolocation=(), interest-cohort=()',
-  )
-  // Only meaningful over TLS, and actively harmful on a plain-HTTP dev server:
-  // one visit would pin localhost to https for the browser's whole cache.
-  if (!isDev) {
-    response.headers.set(
-      'Strict-Transport-Security',
-      'max-age=63072000; includeSubDomains; preload',
-    )
-  }
+  commonHeaders(response.headers, isDev)
 
   return response
 }
@@ -97,14 +127,14 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Everything the browser renders as a document. Excluded:
-     * - api        — JSON and SSE, no HTML to inject into
+     * Everything the browser renders as a document, plus /api — which takes the
+     * transport headers but not the nonce (see proxy() above). Excluded:
      * - _next/*    — build output served straight from disk
      * - static assets by extension
      * Prefetches are skipped too: they produce no document to nonce.
      */
     {
-      source: '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
+      source: '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
       missing: [
         { type: 'header', key: 'next-router-prefetch' },
         { type: 'header', key: 'purpose', value: 'prefetch' },

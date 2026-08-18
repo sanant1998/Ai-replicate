@@ -7,8 +7,9 @@ import { MatrixCalculator } from './tools/MatrixCalculator'
 import { PeriodicTable } from './tools/PeriodicTable'
 import { ScienceTextEditor } from './tools/ScienceTextEditor'
 import { KetcherEditor } from './tools/KetcherEditor'
+import { PracticeGenerator, type Chapter } from './tools/PracticeGenerator'
 
-type ToolId = 'editor' | 'graphing' | 'scientific' | 'ketcher' | 'periodic' | 'matrix'
+type ToolId = 'practice' | 'editor' | 'graphing' | 'scientific' | 'ketcher' | 'periodic' | 'matrix'
 
 type Tool = {
   id: ToolId
@@ -16,6 +17,12 @@ type Tool = {
   blurb: string
   icon: ReactNode
   Panel: ComponentType<{ onClose: () => void }>
+  /**
+   * Whether the tool talks to the server. Every other tool runs wholly in the
+   * browser and costs nothing, which this page says out loud — so the one that
+   * spends a credit has to be labelled rather than quietly counted among them.
+   */
+  online?: boolean
 }
 
 /* Inline icons rather than an icon package: six glyphs do not justify a
@@ -73,7 +80,22 @@ const IconMatrix = (
   </svg>
 )
 
+const IconPractice = (
+  <svg viewBox="0 0 24 24" className="size-5" {...stroke}>
+    <path d="M9 4h9a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8z" />
+    <path d="M9 12h6M9 16h4M12 4v4h4" />
+  </svg>
+)
+
 const TOOLS: Tool[] = [
+  {
+    id: 'practice',
+    name: 'Practice Generator',
+    blurb: 'Fresh questions on any chapter, with the working.',
+    icon: IconPractice,
+    Panel: PracticeGenerator,
+    online: true,
+  },
   {
     id: 'editor',
     name: 'Science Text Editor',
@@ -118,7 +140,7 @@ const TOOLS: Tool[] = [
   },
 ]
 
-export function ToolsWorkspace() {
+export function ToolsWorkspace({ chapters = [] }: { chapters?: Chapter[] }) {
   const [openId, setOpenId] = useState<ToolId | null>(null)
   const open = TOOLS.find((t) => t.id === openId) ?? null
 
@@ -136,7 +158,8 @@ export function ToolsWorkspace() {
       <div>
         <h1 className="text-3xl font-extrabold text-navy-deep">Tools</h1>
         <p className="mt-1 font-semibold text-navy/50">
-          {TOOLS.length} tools, free to use and running entirely in your browser.
+          {TOOLS.length} tools. All but the practice generator run entirely in your browser and cost
+          nothing.
         </p>
       </div>
 
@@ -152,7 +175,14 @@ export function ToolsWorkspace() {
               {tool.icon}
             </span>
             <span className="min-w-0">
-              <span className="block font-extrabold text-navy-deep">{tool.name}</span>
+              <span className="block font-extrabold text-navy-deep">
+                {tool.name}
+                {tool.online && (
+                  <span className="ml-2 rounded-full bg-amber/20 px-2 py-0.5 align-middle text-[11px] font-extrabold uppercase tracking-wide text-navy-deep">
+                    1 credit
+                  </span>
+                )}
+              </span>
               <span className="mt-0.5 block text-sm font-semibold text-navy/50">{tool.blurb}</span>
             </span>
           </button>
@@ -160,7 +190,13 @@ export function ToolsWorkspace() {
       </div>
       </div>
 
-      {OpenPanel && open && <OpenPanel key={open.id} onClose={() => setOpenId(null)} />}
+      {/* The practice panel is the one tool that needs data from the server, so
+          it is rendered directly rather than through the generic Panel slot. */}
+      {open?.id === 'practice' ? (
+        <PracticeGenerator key="practice" chapters={chapters} onClose={() => setOpenId(null)} />
+      ) : (
+        OpenPanel && open && <OpenPanel key={open.id} onClose={() => setOpenId(null)} />
+      )}
     </div>
   )
 }

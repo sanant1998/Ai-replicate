@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyWebhook } from '@/lib/razorpay'
 import { grantForPayment, markPaymentFailed, revokeForPayment } from '@/lib/entitle'
+import { reportError } from '@/lib/observability'
 
 export const runtime = 'nodejs'
 // The signature is computed over the exact bytes Razorpay sent, so this route
@@ -66,9 +67,14 @@ export async function POST(req: Request) {
       // access is handed over, and a mismatch means something upstream is not
       // what we think it is — grant nothing and let a human look.
       if (typeof entity?.amount === 'number' && entity.amount !== payment.amountPaise) {
-        console.error(
-          `[razorpay] amount mismatch on order ${orderId}: charged ${entity.amount}, expected ${payment.amountPaise}`,
-        )
+        // "Let a human look" only works if a human is told. This is the one
+        // event in the whole app where money and access disagree.
+        reportError('razorpay/amount-mismatch', new Error('Charged amount does not match the order'), {
+          orderId,
+          charged: entity.amount,
+          expected: payment.amountPaise,
+          userId: payment.userId,
+        })
         return NextResponse.json({ error: 'AMOUNT_MISMATCH' }, { status: 400 })
       }
 

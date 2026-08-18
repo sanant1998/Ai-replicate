@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { isUnauthenticated, requireUser, SIGNED_OUT_MESSAGE } from '@/lib/session'
+import { isLanguageTag } from '@/lib/language'
 
 export type ProfileState = { error?: string; saved?: boolean }
 
@@ -38,5 +39,36 @@ export async function updateClass(_prev: ProfileState, formData: FormData): Prom
 
   revalidatePath('/academic', 'layout')
   revalidatePath('/profile')
+  return { saved: true }
+}
+
+/**
+ * The language the AI tutor answers in.
+ *
+ * Scoped deliberately: the interface stays in English. A half-translated UI is
+ * worse than an English one, and nobody on this project can proofread Marathi —
+ * whereas a model answering a question in the language the student thinks in is
+ * the part that decides whether they understand the answer.
+ */
+export async function updateLanguage(
+  _prev: ProfileState,
+  formData: FormData,
+): Promise<ProfileState> {
+  let user
+  try {
+    user = await requireUser()
+  } catch (err) {
+    if (isUnauthenticated(err)) return { error: SIGNED_OUT_MESSAGE }
+    throw err
+  }
+
+  const language = String(formData.get('language') ?? '')
+  if (!isLanguageTag(language)) return { error: 'Pick one of the listed languages' }
+
+  await prisma.user.update({ where: { id: user.id }, data: { language } })
+
+  // The <html lang> attribute is set in the root layout, so the whole tree has
+  // to be revalidated rather than just this page.
+  revalidatePath('/', 'layout')
   return { saved: true }
 }

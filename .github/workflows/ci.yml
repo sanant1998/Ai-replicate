@@ -13,6 +13,7 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
 
     # The build needs a reachable database: `prebuild` runs `prisma migrate
     # deploy`, and several pages query during prerender. A throwaway Postgres in
@@ -37,6 +38,23 @@ jobs:
       DIRECT_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/paperpath_ci
       # Not a secret: this database is destroyed with the runner. Never reuse it.
       AUTH_SECRET: ci-only-secret-not-used-anywhere-else-0000
+      APP_ORIGIN: http://localhost:3000
+      VERIFY_BASE: http://localhost:3000
+      # The browser suites drive a real server; this is the origin it is started
+      # on and the one every suite is pointed at.
+      PORT: 3000
+      # Webhook signing only. RAZORPAY_KEY_ID/_SECRET stay unset on purpose:
+      # verify.mjs asserts that /checkout refuses to sell when they are missing.
+      RAZORPAY_WEBHOOK_SECRET: test_webhook_secret
+      # scripts/mock-openai.mjs stands in for the real API, so the tutor legs of
+      # the suites run without spending anything.
+      OPENAI_API_KEY: mock
+      OPENAI_BASE_URL: http://127.0.0.1:4010/v1
+      # verify.mjs cannot see how the server was configured, so it is told:
+      # with a key the tutor route must answer, without one it must fail closed.
+      # The server here has the mock key, so it must answer — leaving this unset
+      # makes the suite assert a 503 the server will never send.
+      TUTOR_CONFIGURED: '1'
 
     steps:
       - uses: actions/checkout@v4
@@ -55,14 +73,81 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # `typecheck` runs `next typegen` first. PageProps, LayoutProps and
+      # RouteContext are generated per route into .next/types, which tsconfig
+      # includes — without it a clean checkout fails with "Cannot find name"
+      # on every page and route handler.
       - name: Typecheck
         run: npm run typecheck
 
       - name: Unit tests
+        run: npm test
+
+      - name: Expression engine
         run: npm run verify:expression
+
+      - name: Build
+        run: npm run build
+
+      # ---------------------------------------------------------------- e2e --
+      # Everything below needs a running app. Previously the payment suite ran
+      # with no server at all and died on ECONNREFUSED, and the three browser
+      # suites — which are the bulk of the coverage — never ran in CI.
+
+      - name: Seed the catalog and demo accounts
+        run: npm run db:seed
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # Polled with curl rather than a wait-on dependency: `npx wait-on` would
+      # reach out to the registry on every run, which is a network failure this
+      # job does not need.
+      - name: Start the mock model server
+        run: |
+          npm run mock:openai > .mock.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:4010/healthz > /dev/null && exit 0
+            sleep 1
+          done
+          echo "mock model server never came up"; cat .mock.log; exit 1
+
+      - name: Start the app
+        run: |
+          npm start > .start.log 2>&1 &
+          for i in $(seq 1 90); do
+            curl -fsS http://localhost:3000/api/health > /dev/null && exit 0
+            sleep 1
+          done
+          echo "app never became healthy"; cat .start.log; exit 1
 
       - name: Payment webhook suite
         run: npm run verify:payments
 
-      - name: Build
-        run: npm run build
+      - name: Browser suite
+        run: npm run verify
+
+      - name: Tools suite
+        run: npm run verify:tools
+
+      - name: Staff and roles suite
+        run: npm run verify:staff
+
+      # The browser suites spend credits and create accounts, so the tutor suite
+      # gets a clean database rather than whatever they left behind.
+      - name: Tutor suite
+        run: |
+          npm run db:seed
+          npm run verify:tutor
+
+      - name: Server log
+        if: failure()
+        run: tail -n 200 .start.log || true
+
+      - name: Screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-shots
+          path: .verify-shots/
+          if-no-files-found: ignore

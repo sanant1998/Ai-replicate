@@ -31,8 +31,18 @@ export async function GET() {
     )
   }
 
-  const [progress, notes, bookmarks, attempts, chats, payments, subscriptions, credits] =
-    await Promise.all([
+  const [
+    progress,
+    notes,
+    bookmarks,
+    attempts,
+    chats,
+    payments,
+    subscriptions,
+    credits,
+    guardians,
+    refunds,
+  ] = await Promise.all([
       prisma.progress.findMany({
         where: { userId: user.id },
         include: { topic: { select: { title: true } } },
@@ -56,6 +66,11 @@ export async function GET() {
       prisma.payment.findMany({ where: { userId: user.id } }),
       prisma.subscription.findMany({ where: { userId: user.id } }),
       prisma.creditLedger.findMany({ where: { userId: user.id } }),
+      prisma.parentLink.findMany({
+        where: { studentId: user.id },
+        include: { parent: { select: { name: true, email: true } } },
+      }),
+      prisma.refundRequest.findMany({ where: { userId: user.id } }),
     ])
 
   const payload = {
@@ -69,8 +84,19 @@ export async function GET() {
       class: user.classLevel?.label ?? null,
       emailVerifiedAt: user.emailVerifiedAt,
       consentAcceptedAt: user.consentAcceptedAt,
+      // Who was asked for permission and when they gave it. A parent making a
+      // DPDP request is often asking exactly this, so leaving it out would make
+      // the export answer every question but theirs.
+      guardianEmail: user.guardianEmail,
+      guardianConsentAt: user.guardianConsentAt,
       createdAt: user.createdAt,
     },
+    guardians: guardians.map((g) => ({
+      name: g.parent.name,
+      email: g.parent.email,
+      linkedAt: g.createdAt,
+    })),
+    refundRequests: refunds,
     progress,
     notes,
     bookmarks,

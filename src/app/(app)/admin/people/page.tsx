@@ -76,11 +76,11 @@ export default async function PeoplePage(props: PageProps<'/admin/people'>) {
           defaultValue={query}
           placeholder="Search by name or email…"
           aria-label="Search people"
-          className="min-h-10 w-full max-w-sm rounded-xl border border-navy/15 bg-white px-3 font-semibold text-navy-deep outline-none transition focus:border-amber"
+          className="min-h-10 w-full max-w-sm rounded-xl border border-navy/15 bg-surface px-3 font-semibold text-navy-deep outline-none transition focus:border-amber"
         />
         <button
           type="submit"
-          className="min-h-10 rounded-xl border border-navy/15 bg-white px-4 text-sm font-extrabold text-navy/65 transition hover:border-amber"
+          className="min-h-10 rounded-xl border border-navy/15 bg-surface px-4 text-sm font-extrabold text-navy/65 transition hover:border-amber"
         >
           Search
         </button>

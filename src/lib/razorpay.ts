@@ -48,6 +48,43 @@ export async function createOrder(opts: {
   return (await res.json()) as RazorpayOrder
 }
 
+/**
+ * Sends the money back.
+ *
+ * Deliberately does not touch entitlement: the refund webhook is still the only
+ * thing that calls `revokeForPayment`, so there is exactly one path that takes
+ * access away, whether the refund started here or in Razorpay's dashboard.
+ *
+ * `speed: 'normal'` rather than 'optimum' — optimum tries an instant refund and
+ * charges for it. A student promised a refund "within 7 working days" does not
+ * need it in ten minutes at a premium.
+ *
+ * There is no idempotency header on this endpoint, so calling it twice really
+ * does issue two refunds. The caller is responsible for not doing that: the
+ * approval moves its RefundRequest to SENT inside the same transaction that
+ * reads it, so a double-clicked approval finds the row already claimed.
+ */
+export async function createRefund(opts: {
+  providerPaymentId: string
+  amountPaise: number
+  notes: Record<string, string>
+}): Promise<{ id: string; status: string }> {
+  const res = await fetch(`${API}/payments/${encodeURIComponent(opts.providerPaymentId)}/refund`, {
+    method: 'POST',
+    headers: { authorization: authHeader(), 'content-type': 'application/json' },
+    body: JSON.stringify({
+      amount: opts.amountPaise,
+      speed: 'normal',
+      notes: opts.notes,
+    }),
+  })
+
+  if (!res.ok) {
+    throw new Error(`Razorpay refused the refund (${res.status}): ${await res.text()}`)
+  }
+  return (await res.json()) as { id: string; status: string }
+}
+
 function safeEqualHex(a: string, b: string) {
   const x = Buffer.from(a)
   const y = Buffer.from(b)

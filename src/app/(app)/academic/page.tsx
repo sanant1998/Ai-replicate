@@ -11,7 +11,7 @@ import { IconBook, IconChevron, IconClock, IconList, IconLock, IconPlay, IconRob
 export const metadata = {
   title: 'Course catalog — chapter-wise lessons for Class 5 to 12 | PaperPath',
   description:
-    'Browse CBSE, ICSE and state board courses by class and subject. Chapter 1 of every subject is free to watch.',
+    'Browse CBSE courses by class and subject. Chapter 1 of every subject is free to watch.',
 }
 
 /**
@@ -121,12 +121,16 @@ export default async function AcademicPage(props: PageProps<'/academic'>) {
     <div className="space-y-5">
       {/* ---------------------------------------------------------------- hero */}
       <section className="hero-surface relative overflow-hidden rounded-3xl px-6 py-7 sm:px-8">
-        <div className="pointer-events-none absolute -right-16 -top-20 size-64 rounded-full bg-white/40 blur-2xl" />
+        <div className="pointer-events-none absolute -right-16 -top-20 size-64 rounded-full bg-surface/40 blur-2xl" />
 
         <div className="relative flex flex-wrap items-start justify-between gap-4">
           <div>
+            {/* The board this class actually belongs to, not a list of boards
+                the catalog does not carry. "State Boards" was printed beside
+                every class regardless, on a catalog that has only ever held
+                CBSE — a claim the page itself disproves one scroll down. */}
             <p className="text-sm font-bold text-navy/70">
-              {classLevel.board.code} · State Boards ·{' '}
+              {classLevel.board.code} ·{' '}
               <span className="text-ember">Chapter-wise video lectures</span>
             </p>
             <h1 className="mt-1 text-4xl font-extrabold tracking-tight text-navy sm:text-5xl">
@@ -153,7 +157,7 @@ export default async function AcademicPage(props: PageProps<'/academic'>) {
             </Link>
             <Link
               href="/tutor"
-              className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-extrabold text-navy shadow-md"
+              className="flex items-center gap-2 rounded-full bg-surface px-4 py-2.5 text-sm font-extrabold text-navy shadow-md"
             >
               <span className="size-2 rounded-full bg-ember" /> Live{' '}
               <span className="font-medium opacity-70">AI TUTOR</span>
@@ -190,7 +194,7 @@ export default async function AcademicPage(props: PageProps<'/academic'>) {
               defaultValue={query}
               placeholder="Search chapters…"
               aria-label="Search chapters and topics"
-              className="w-48 rounded-xl border border-navy/15 bg-white px-3.5 py-2 text-sm font-semibold text-navy-deep outline-none transition focus:border-amber"
+              className="w-48 rounded-xl border border-navy/15 bg-surface px-3.5 py-2 text-sm font-semibold text-navy-deep outline-none transition focus:border-amber"
             />
             {query && (
               <Link
@@ -284,7 +288,7 @@ export default async function AcademicPage(props: PageProps<'/academic'>) {
                 key={chapter.id}
                 className="flex items-center gap-4 rounded-3xl card-surface px-4 py-3.5 transition hover:-translate-y-px"
               >
-                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-navy text-sm font-extrabold text-white">
+                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-navy-solid text-sm font-extrabold text-white">
                   {chapter.index}
                 </span>
 
@@ -304,7 +308,7 @@ export default async function AcademicPage(props: PageProps<'/academic'>) {
                 {unlocked ? (
                   <Link
                     href={`/tutor?chapter=${chapter.id}`}
-                    className="flex shrink-0 items-center gap-1.5 rounded-full bg-navy px-4 py-2 text-sm font-bold text-white transition hover:bg-navy-deep"
+                    className="flex shrink-0 items-center gap-1.5 rounded-full bg-navy-solid px-4 py-2 text-sm font-bold text-white transition hover:bg-navy-solid-deep"
                   >
                     <IconRobot className="size-4" /> AI Tutor
                   </Link>
@@ -350,8 +354,8 @@ function FilterChip({ href, active, label }: { href: string; active: boolean; la
       className={clsx(
         'rounded-xl border px-4 py-2 text-sm font-bold transition',
         active
-          ? 'border-amber bg-white text-ember shadow-sm'
-          : 'border-navy/10 bg-white/60 text-navy/70 hover:border-navy/25',
+          ? 'border-amber bg-surface text-ember shadow-sm'
+          : 'border-navy/10 bg-surface/60 text-navy/70 hover:border-navy/25',
       )}
     >
       {label}

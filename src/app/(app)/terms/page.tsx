@@ -47,6 +47,11 @@ export default function TermsPage() {
             runs to the end of its term. Refunds are returned to the original payment method within 7
             working days of approval.
           </li>
+          <li>
+            <strong>How to ask:</strong> open your profile, find the payment under “Payments”, and use
+            “Ask for a refund”. You will get a receipt for every payment on the same page, and an
+            answer by email.
+          </li>
           <li>Chapter 1 of every subject stays free and needs no subscription.</li>
         </ul>
       </Section>

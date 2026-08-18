@@ -161,7 +161,7 @@ export default async function LearnPage(props: PageProps<'/learn/[topicId]'>) {
           <div className="mt-4 flex flex-wrap gap-2">
             <Link
               href={`/tutor?chapter=${chapter.id}`}
-              className="inline-flex items-center gap-2 rounded-full bg-navy px-5 py-2.5 text-sm font-bold text-white transition hover:bg-navy-deep"
+              className="inline-flex items-center gap-2 rounded-full bg-navy-solid px-5 py-2.5 text-sm font-bold text-white transition hover:bg-navy-solid-deep"
             >
               <IconRobot className="size-4" />
               Ask the AI tutor about this chapter
@@ -169,7 +169,7 @@ export default async function LearnPage(props: PageProps<'/learn/[topicId]'>) {
             {questionCount > 0 && (
               <Link
                 href={`/quiz/${chapter.id}`}
-                className="inline-flex items-center gap-2 rounded-full border border-navy/15 bg-white px-5 py-2.5 text-sm font-bold text-navy-deep transition hover:border-amber"
+                className="inline-flex items-center gap-2 rounded-full border border-navy/15 bg-surface px-5 py-2.5 text-sm font-bold text-navy-deep transition hover:border-amber"
               >
                 <IconList className="size-4" />
                 Take the chapter quiz
@@ -185,7 +185,7 @@ export default async function LearnPage(props: PageProps<'/learn/[topicId]'>) {
                     'inline-flex items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-bold transition',
                     bookmarked
                       ? 'border-amber bg-amber/15 text-navy-deep'
-                      : 'border-navy/15 bg-white text-navy-deep hover:border-amber',
+                      : 'border-navy/15 bg-surface text-navy-deep hover:border-amber',
                   )}
                 >
                   {bookmarked ? '★ Saved' : '☆ Save chapter'}

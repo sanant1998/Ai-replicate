@@ -97,8 +97,13 @@ const subjectName = `Probe Subject ${stamp}`
 
   // Both forms use input[name=slug], and every existing row carries a collapsed
   // edit form, so an unscoped selector grabs a hidden field. Scope to the section.
-  const classes = () => page.locator('section', { hasText: 'CLASSES' }).first()
-  const subjects = () => page.locator('section', { hasText: 'SUBJECTS' }).first()
+  //
+  // By landmark, not by text. `hasText` is a case-insensitive substring match,
+  // so "CLASSES" also matched the boards list once it started printing "3
+  // classes · 6 students" — and `.first()` then picked the wrong one. Each
+  // section carries an aria-labelledby heading precisely so it can be named.
+  const classes = () => page.getByRole('region', { name: 'CLASSES' })
+  const subjects = () => page.getByRole('region', { name: 'SUBJECTS' })
 
   await page.goto(`${BASE}/admin/catalog`, { waitUntil: 'domcontentloaded' })
   await classes().locator('button:has-text("New class")').click()

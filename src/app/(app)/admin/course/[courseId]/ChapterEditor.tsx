@@ -27,7 +27,7 @@ export function ChapterEditor({ courseId, nextIndex }: { courseId: string; nextI
             min={1}
             defaultValue={nextIndex}
             required
-            className="w-full rounded-xl border border-navy/15 bg-white px-3 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber"
+            className="w-full rounded-xl border border-navy/15 bg-surface px-3 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber"
           />
         </label>
         <label className="block">
@@ -36,7 +36,7 @@ export function ChapterEditor({ courseId, nextIndex }: { courseId: string; nextI
             name="title"
             required
             placeholder="Rational Numbers"
-            className="w-full rounded-xl border border-navy/15 bg-white px-3 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber"
+            className="w-full rounded-xl border border-navy/15 bg-surface px-3 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber"
           />
         </label>
       </div>
@@ -46,7 +46,7 @@ export function ChapterEditor({ courseId, nextIndex }: { courseId: string; nextI
         <textarea
           name="summary"
           rows={2}
-          className="w-full resize-y rounded-xl border border-navy/15 bg-white px-3 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber"
+          className="w-full resize-y rounded-xl border border-navy/15 bg-surface px-3 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber"
         />
       </label>
 

@@ -6,7 +6,15 @@ import { formatPaise } from '@/lib/format'
 import { logout } from '@/app/login/actions'
 import { effectiveCreditCap } from '@/lib/credits'
 import { ClassSettings } from './ClassSettings'
-import { AccountControls, VerifyEmailNotice } from './AccountControls'
+import { LanguageSettings } from './LanguageSettings'
+import {
+  AccountControls,
+  GuardianControls,
+  SecurityControls,
+  VerifyEmailNotice,
+} from './AccountControls'
+import { PaymentHistory } from './PaymentHistory'
+import { withinRefundWindow } from '@/lib/billing'
 
 export const metadata = { title: 'Profile — PaperPath' }
 
@@ -21,6 +29,16 @@ export default async function ProfilePage() {
     include: { course: { include: { subject: true } } },
   })
 
+  const payments = await prisma.payment.findMany({
+    where: { userId: user.id, status: { in: ['PAID', 'REFUNDED'] } },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      classLevel: { select: { label: true } },
+      course: { include: { subject: { select: { name: true } } } },
+      refundRequests: { orderBy: { createdAt: 'desc' }, take: 1 },
+    },
+  })
+
   const boards = await prisma.board.findMany({
     where: { classes: { some: {} } },
     orderBy: { code: 'asc' },
@@ -32,6 +50,15 @@ export default async function ProfilePage() {
       <h1 className="text-3xl font-extrabold text-navy-deep">Profile</h1>
 
       {!user.emailVerifiedAt && <VerifyEmailNotice email={user.email} />}
+
+      {/* Staff and parents are adults; the consent card is for the students the
+          Act is about. */}
+      {user.role === 'STUDENT' && (
+        <GuardianControls
+          guardianEmail={user.guardianEmail}
+          consentedAt={user.guardianConsentAt?.toLocaleDateString('en-IN') ?? null}
+        />
+      )}
 
       <dl className="rounded-3xl card-surface divide-y divide-navy/8">
         <Row label="Name" value={user.name} />
@@ -56,6 +83,8 @@ export default async function ProfilePage() {
         currentClassId={user.classLevelId ?? undefined}
       />
 
+      <LanguageSettings current={user.language} />
+
       {subs.length > 0 && (
         <div className="rounded-3xl card-surface divide-y divide-navy/8">
           <p className="px-6 py-3 text-sm font-extrabold tracking-wider text-navy/45">SUBSCRIPTIONS</p>
@@ -72,10 +101,30 @@ export default async function ProfilePage() {
         </div>
       )}
 
+      <PaymentHistory
+        payments={payments.map((p) => {
+          const latest = p.refundRequests[0] ?? null
+          return {
+            id: p.id,
+            plan:
+              p.scope === 'CLASS'
+                ? `Complete ${p.classLevel?.label ?? 'class'}`
+                : (p.course?.subject.name ?? 'Single subject'),
+            amount: formatPaise(p.amountPaise),
+            paidOn: p.createdAt.toLocaleDateString('en-IN'),
+            status: p.status,
+            refundable: p.status === 'PAID' && !p.refundedAt && withinRefundWindow(p.createdAt),
+            refund: latest ? { status: latest.status, note: latest.decisionNote } : null,
+          }
+        })}
+      />
+
+      <SecurityControls name={user.name} />
+
       <form action={logout}>
         <button
           type="submit"
-          className="rounded-2xl border border-navy/15 bg-white px-5 py-2.5 font-bold text-navy-deep transition hover:border-ember hover:text-ember"
+          className="rounded-2xl border border-navy/15 bg-surface px-5 py-2.5 font-bold text-navy-deep transition hover:border-ember hover:text-ember"
         >
           Sign out
         </button>

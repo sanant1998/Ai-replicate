@@ -6,6 +6,8 @@ import { readSession } from '@/lib/session'
 import { refundCredit, spendCredit, tutorBudgetExhausted } from '@/lib/credits'
 import { canAccessChapter, getEntitlements } from '@/lib/access'
 import { clientIp, hit, hitIp } from '@/lib/rate-limit'
+import { languageInstruction } from '@/lib/language'
+import { reportError } from '@/lib/observability'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -23,6 +25,7 @@ function systemPrompt(ctx: {
   studentName: string
   classLabel: string | null
   boardCode: string | null
+  language: string
   chapter?: { subject: string; index: number; title: string; topics: string[] }
 }) {
   const lines = [
@@ -39,6 +42,9 @@ function systemPrompt(ctx: {
     '- If you are unsure or the question is ambiguous, say so plainly instead of inventing an answer.',
   ]
 
+  const inLanguage = languageInstruction(ctx.language)
+  if (inLanguage) lines.push(`- ${inLanguage}`)
+
   if (ctx.chapter) {
     lines.push(
       '',
@@ -51,7 +57,13 @@ function systemPrompt(ctx: {
   return lines.join('\n')
 }
 
-function careerPrompt(ctx: { studentName: string; classLabel: string | null; boardCode: string | null }) {
+function careerPrompt(ctx: {
+  studentName: string
+  classLabel: string | null
+  boardCode: string | null
+  language: string
+}) {
+  const inLanguage = languageInstruction(ctx.language)
   return [
     `You are the PaperPath career guide. You are advising ${ctx.studentName}, a ${ctx.classLabel ?? 'school'} student on the ${ctx.boardCode ?? 'CBSE'} syllabus in India.`,
     '',
@@ -62,6 +74,7 @@ function careerPrompt(ctx: { studentName: string; classLabel: string | null; boa
     '- Name the realistic entry routes, including ones that do not need an expensive coaching class.',
     '- Never promise admission, salary figures, or cut-offs as fact — describe ranges and tell them to verify with the official board or exam body.',
     '- Keep the student in the driving seat. They are a minor; suggest they talk it through with a parent or teacher for any irreversible choice.',
+    ...(inLanguage ? [`- ${inLanguage}`] : []),
   ].join('\n')
 }
 
@@ -103,6 +116,13 @@ export async function POST(req: Request) {
     include: { classLevel: true, board: true },
   })
 
+  // A test account exists to exercise guided practice and nothing else. The
+  // layout keeps it off the other pages; this keeps it off the general tutor,
+  // which is the one that would answer anything and spend real tokens doing it.
+  if (user.testMode) {
+    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 })
+  }
+
   // ---- chapter context, gated by the same entitlement rules as the player ---
   let chapter = null
   if (parsed.data.chapterId) {
@@ -127,7 +147,11 @@ export async function POST(req: Request) {
   // any call to the model: this is the last gate that can still say no for
   // free.
   if (await tutorBudgetExhausted()) {
-    console.error('[tutor] daily site-wide model budget exhausted — refusing further requests')
+    // Not an exception, but the one operational event nobody would otherwise
+    // hear about: every student is being told the tutor is closed for the day.
+    reportError('tutor/budget-exhausted', new Error('Daily site-wide model budget exhausted'), {
+      userId: user.id,
+    })
     return NextResponse.json(
       {
         error: 'BUDGET_EXHAUSTED',
@@ -215,11 +239,13 @@ export async function POST(req: Request) {
                 studentName: user.name,
                 classLabel: user.classLevel?.label ?? null,
                 boardCode: user.board?.code ?? null,
+                language: user.language,
               })
             : systemPrompt({
                 studentName: user.name,
                 classLabel: user.classLevel?.label ?? null,
                 boardCode: user.board?.code ?? null,
+                language: user.language,
                 chapter: chapter
                   ? {
                       subject: chapter.course.subject.name,
@@ -263,7 +289,7 @@ export async function POST(req: Request) {
         if (!req.signal.aborted) {
           if (!full) {
             await refundCredit(user.id, 'Tutor request failed').catch((refundErr) =>
-              console.error('[tutor] credit refund failed', refundErr),
+              reportError('tutor/refund', refundErr, { userId: user.id }),
             )
           }
           send('error', {
