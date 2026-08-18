@@ -4,6 +4,7 @@ import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '../src/generated/prisma/client.js'
 import { QUESTIONS } from './questions.js'
 import { SUBJECT_META, SYLLABUS } from './syllabus.js'
+import { seedTester, TESTER_EMAIL } from './tester.js'
 
 // Seeding writes a lot of rows in sequence, so it uses the direct endpoint when
 // one is configured — same reason migrations do.
@@ -326,6 +327,12 @@ async function main() {
       endsAt,
     },
   })
+
+  // Same account the standalone `npm run db:tester` creates, so a reset does not
+  // quietly leave the client without the login they were given.
+  console.log('→ guided-practice test account')
+  await seedTester(prisma)
+  console.log(`  ${TESTER_EMAIL}`)
 
   const counts = {
     chapters: await prisma.chapter.count(),

@@ -11,20 +11,129 @@
   --color-ember: #ea580c;
   --color-moss: #22c55e;
 
+  /**
+   * The surface that used to be `bg-white`: an input, a dropdown, a secondary
+   * button, a card raised above another card.
+   *
+   * Registered as a theme *colour* rather than written as a custom utility so
+   * that the opacity modifiers keep working — `bg-surface/45` and
+   * `bg-surface/80` are both in use, and a plain `@utility` would silently
+   * generate nothing for them. Points at a variable that the dark block below
+   * redefines; custom properties resolve where they are used, so the indirection
+   * is what makes one token follow two themes.
+   */
+  --color-surface: var(--surface);
+
+  /**
+   * Navy used as a *fill* under white text — the chapter-number badge, the "AI
+   * Tutor" chip, the send button, the student's own chat bubble.
+   *
+   * These cannot use plain `bg-navy`. Inverting navy from dark ink to pale ink
+   * is exactly right for text and for alpha overlays, and exactly wrong here:
+   * the white lettering was chosen against a dark fill, so a pale fill left it
+   * at a contrast ratio of 1.5 — invisible. Fourteen elements did this, and the
+   * screenshots showed it before the contrast pass measured it.
+   *
+   * So the fill stays dark in both themes, lifted a little in dark so the chip
+   * still separates from the card behind it. White on either is above AA.
+   */
+  --color-navy-solid: #2c5282;
+  --color-navy-solid-deep: #1e3a5f;
+
   --font-sans: 'Nunito Variable', ui-sans-serif, system-ui, sans-serif;
 
   --radius-card: 1.25rem;
 }
 
+/*
+ * Dark mode, done by redefining what the tokens *mean* rather than by adding a
+ * `dark:` variant to every element.
+ *
+ * The app names its colours semantically already — `text-navy-deep` is the
+ * heading colour, `text-navy/50` the muted one, `bg-navy/5` a subtle raised
+ * surface, `border-navy/15` a hairline. Tailwind v4 compiles each of those to
+ * `var(--color-navy…)`, so moving navy from a dark blue to a pale one flips all
+ * 518 of those usages at once, and the alpha steps keep working: a 5% pale
+ * overlay on a dark page reads exactly as a 5% dark overlay does on a light one.
+ *
+ * Two switches, in this order:
+ *   - no choice stored  -> follow the operating system (prefers-color-scheme)
+ *   - a choice stored   -> [data-theme] on <html> wins over the media query
+ *
+ * `bg-white` cannot participate — it is a literal — which is why it was
+ * replaced throughout by `bg-surface` below.
+ */
 :root {
   --background: var(--color-sand);
   --foreground: #1a1a1a;
+  /* The colour of an input, a dropdown, a raised card on top of a card. */
+  --surface: #ffffff;
+  --card: var(--color-cream);
+  --card-shadow: 0 1px 2px rgb(44 82 130 / 0.06), 0 8px 24px -12px rgb(44 82 130 / 0.18);
+  --hero: radial-gradient(120% 140% at 12% 0%, #fff6e9 0%, #fdeede 45%, #f7e2cf 100%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-sand: #131b26;
+    --color-cream: #1a2432;
+    --color-parchment: #22303f;
+    /* Inverted roles: navy is now the *light* ink, navy-deep the brightest. */
+    --color-navy: #c3d3e6;
+    --color-navy-deep: #edf3fa;
+    /* Amber and ember are brand colours and stay recognisable, lifted just
+       enough to clear contrast against a dark surface. */
+    --color-amber: #fbbf24;
+    --color-ember: #fb8a4c;
+    --color-moss: #4ade80;
+    /* Lifted so a filled chip still separates from the dark card behind it;
+       white on this is 6.6:1. */
+    --color-navy-solid: #356197;
+    --color-navy-solid-deep: #2c5282;
+
+    --foreground: #e9eff7;
+    --surface: #22303f;
+    --card-shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+    --hero: radial-gradient(120% 140% at 12% 0%, #24303f 0%, #1b2635 45%, #151d29 100%);
+  }
+}
+
+:root[data-theme='dark'] {
+  --color-sand: #131b26;
+  --color-cream: #1a2432;
+  --color-parchment: #22303f;
+  --color-navy: #c3d3e6;
+  --color-navy-deep: #edf3fa;
+  --color-amber: #fbbf24;
+  --color-ember: #fb8a4c;
+  --color-moss: #4ade80;
+  --color-navy-solid: #356197;
+  --color-navy-solid-deep: #2c5282;
+
+  --foreground: #e9eff7;
+  --surface: #22303f;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+  --hero: radial-gradient(120% 140% at 12% 0%, #24303f 0%, #1b2635 45%, #151d29 100%);
+}
+
+/* Tells the browser to paint form controls, scrollbars and the like to match. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+  }
 }
 
 /* Tool shell.
-   The dark toggle is deliberately scoped to `.tool-shell` rather than the html
-   element: the rest of the app has no dark styles, so flipping a global class
-   would leave the sidebar and catalog unreadable behind the overlay. */
+   Still its own theme scope, but no longer because the app has none: a tool is
+   a full-screen overlay, and someone reading a dark app may still want a light
+   canvas to draw a molecule on. It now *opens* in the app's theme (see
+   ToolShell) and the header toggle overrides it for that panel only. */
 .tool-shell {
   --shell-bg: #f3e2c9;
   --shell-panel: var(--color-cream);
@@ -63,13 +172,9 @@ body {
 }
 
 @utility hero-surface {
-  background: radial-gradient(
-    120% 140% at 12% 0%,
-    #fff6e9 0%,
-    #fdeede 45%,
-    #f7e2cf 100%
-  );
+  background: var(--hero);
 }
+
 
 @utility flame-gradient {
   background: linear-gradient(135deg, #f59e0b, #ea580c);
@@ -77,13 +182,17 @@ body {
 
 @utility card-surface {
   background: var(--color-cream);
-  box-shadow: 0 1px 2px rgb(44 82 130 / 0.06), 0 8px 24px -12px rgb(44 82 130 / 0.18);
+  /* A navy-tinted shadow reads as depth on parchment and as nothing at all on a
+     dark page, so the shadow is a token too. */
+  box-shadow: var(--card-shadow);
 }
 
-/* Thin scrollbars inside the chapter list and chat transcript. */
+/* Thin scrollbars inside the chapter list and chat transcript. The thumb is a
+   navy wash, which follows the theme like everything else — a dark thumb on a
+   dark track is a scrollbar nobody can find. */
 @utility scroll-slim {
   scrollbar-width: thin;
-  scrollbar-color: rgb(44 82 130 / 0.25) transparent;
+  scrollbar-color: color-mix(in oklab, var(--color-navy) 25%, transparent) transparent;
 }
 
 @keyframes rise {

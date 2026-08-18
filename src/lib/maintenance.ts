@@ -42,18 +42,20 @@ export async function runMaintenance(): Promise<MaintenanceReport> {
     data: { status: 'FAILED', failureReason: 'Checkout abandoned' },
   })
 
-  const [resets, verifications] = await Promise.all([
-    prisma.passwordResetToken.deleteMany({
-      where: { OR: [{ usedAt: { not: null } }, { expiresAt: { lt: now } }], createdAt: { lt: purgeBefore } },
-    }),
-    prisma.emailVerificationToken.deleteMany({
-      where: { OR: [{ usedAt: { not: null } }, { expiresAt: { lt: now } }], createdAt: { lt: purgeBefore } },
-    }),
+  const spent = {
+    OR: [{ usedAt: { not: null } }, { expiresAt: { lt: now } }],
+    createdAt: { lt: purgeBefore },
+  }
+
+  const [resets, verifications, guardians] = await Promise.all([
+    prisma.passwordResetToken.deleteMany({ where: spent }),
+    prisma.emailVerificationToken.deleteMany({ where: spent }),
+    prisma.guardianConsentToken.deleteMany({ where: spent }),
   ])
 
   return {
     subscriptionsExpired: subscriptions.count,
     checkoutsAbandoned: checkouts.count,
-    tokensPurged: resets.count + verifications.count,
+    tokensPurged: resets.count + verifications.count + guardians.count,
   }
 }

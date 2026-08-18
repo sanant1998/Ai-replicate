@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { isUnauthenticated, requireUser, SIGNED_OUT_MESSAGE } from '@/lib/session'
 import { createOrder, isConfigured, publicKeyId } from '@/lib/razorpay'
 import { grantForPayment } from '@/lib/entitle'
+import { reportError } from '@/lib/observability'
 
 export type CheckoutState = {
   error?: string
@@ -162,7 +163,9 @@ export async function startCheckout(
       },
     }
   } catch (err) {
-    console.error('[checkout] order creation failed', err)
+    // A payment provider that has started refusing orders is invisible from
+    // outside — the page just says "try again" — so this is one to be told about.
+    reportError('checkout/order', err, { userId: user.id, scope, planId: id })
     await prisma.payment.update({
       where: { id: payment.id },
       data: { status: 'FAILED', failureReason: 'Order creation failed' },

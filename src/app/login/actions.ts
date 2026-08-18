@@ -7,9 +7,12 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { createSession, currentUser, destroySession, SIGNED_OUT_MESSAGE } from '@/lib/session'
 import { actionIp, hit, hitIp } from '@/lib/rate-limit'
-import { sendEmailVerification } from '@/lib/email'
+import { sendEmailVerification, sendGuardianConsent } from '@/lib/email'
 import { issueVerificationToken } from '@/lib/verify-email'
+import { issueGuardianToken } from '@/lib/guardian'
 import { appOrigin } from '@/lib/origin'
+import { safeNext } from '@/lib/safe-redirect'
+import { reportError } from '@/lib/observability'
 
 const Credentials = z.object({
   email: z.email('Enter a valid email address'),
@@ -17,17 +20,6 @@ const Credentials = z.object({
 })
 
 export type AuthState = { error?: string }
-
-/**
- * Where to land after signing in. Only same-site, absolute-path destinations are
- * honoured — anything else (a full URL, or a protocol-relative `//evil.com`)
- * would turn the login form into an open redirect.
- */
-function safeNext(raw: FormDataEntryValue | null): string {
-  const next = String(raw ?? '')
-  if (!next.startsWith('/') || next.startsWith('//')) return '/academic'
-  return next
-}
 
 export async function login(_prev: AuthState, formData: FormData): Promise<AuthState> {
   const parsed = Credentials.safeParse({
@@ -52,7 +44,11 @@ export async function login(_prev: AuthState, formData: FormData): Promise<AuthS
   if (!user || !ok) return { error: 'Email or password is incorrect' }
 
   await createSession({ uid: user.id, email: user.email })
-  redirect(safeNext(formData.get('next')))
+  // A test account has exactly one page. Sending it to `next` — which defaults
+  // to the academic dashboard — would mean landing somewhere the app layout has
+  // to bounce it off, and a redirect out of a layout mid-navigation renders an
+  // empty document rather than the destination.
+  redirect(user.testMode ? '/guided' : safeNext(formData.get('next')))
 }
 
 export async function signup(_prev: AuthState, formData: FormData): Promise<AuthState> {
@@ -91,6 +87,19 @@ export async function signup(_prev: AuthState, formData: FormData): Promise<Auth
     return { error: 'Please choose your board and class' }
   }
 
+  // A guardian's address, if one was given. Optional rather than required: a
+  // hard gate here loses the student who does not have one to hand, and an
+  // account with no guardian consent is still an account we can throttle and
+  // still an account a guardian can be added to later from the profile.
+  const guardianRaw = String(formData.get('guardianEmail') ?? '').trim()
+  const guardianEmail = guardianRaw ? z.email().safeParse(guardianRaw) : null
+  if (guardianEmail && !guardianEmail.success) {
+    return { error: 'That parent or guardian email does not look right' }
+  }
+  if (guardianEmail?.data && guardianEmail.data.toLowerCase() === parsed.data.email.toLowerCase()) {
+    return { error: 'The guardian email must be different from your own' }
+  }
+
   const user = await prisma.user.create({
     data: {
       email: parsed.data.email,
@@ -99,8 +108,11 @@ export async function signup(_prev: AuthState, formData: FormData): Promise<Auth
       boardId: classLevel.boardId,
       classLevelId: classLevel.id,
       consentAcceptedAt: new Date(),
+      guardianEmail: guardianEmail?.data ?? null,
     },
   })
+
+  if (guardianEmail?.data) after(sendGuardianRequest(user.id, name, guardianEmail.data))
 
   // Signing in immediately is deliberate: an unverified account still works,
   // just on the reduced credit cap. Blocking a 13-year-old at the door over an
@@ -114,7 +126,11 @@ export async function signup(_prev: AuthState, formData: FormData): Promise<Auth
   after(sendVerificationEmail(user.id, user.email))
 
   await createSession({ uid: user.id, email: user.email })
-  redirect(safeNext(formData.get('next')))
+  // A test account has exactly one page. Sending it to `next` — which defaults
+  // to the academic dashboard — would mean landing somewhere the app layout has
+  // to bounce it off, and a redirect out of a layout mid-navigation renders an
+  // empty document rather than the destination.
+  redirect(user.testMode ? '/guided' : safeNext(formData.get('next')))
 }
 
 /**
@@ -127,8 +143,59 @@ async function sendVerificationEmail(userId: string, email: string) {
     const raw = await issueVerificationToken(userId)
     await sendEmailVerification(email, `${await appOrigin()}/verify-email?token=${raw}`)
   } catch (err) {
-    console.error('[signup] verification mail failed', err)
+    reportError('signup/verification-mail', err, { userId })
   }
+}
+
+/**
+ * Mails the guardian a consent link. Same failure policy as the confirmation
+ * mail: logged, never surfaced. The account exists either way, and the student
+ * can send another from their profile.
+ */
+async function sendGuardianRequest(userId: string, childName: string, guardianEmail: string) {
+  try {
+    const raw = await issueGuardianToken(userId)
+    await sendGuardianConsent(
+      guardianEmail,
+      childName,
+      `${await appOrigin()}/guardian?token=${raw}`,
+    )
+  } catch (err) {
+    reportError('signup/guardian-mail', err, { userId })
+  }
+}
+
+/**
+ * Sends (or re-sends) the guardian consent request for the signed-in student,
+ * to an address they can correct — a mistyped guardian email at signup would
+ * otherwise be permanent.
+ */
+export async function requestGuardianConsent(
+  _prev: AuthState,
+  formData: FormData,
+): Promise<AuthState> {
+  const user = await currentUser()
+  if (!user) return { error: SIGNED_OUT_MESSAGE }
+
+  const parsedEmail = z.email('Enter a valid email address').safeParse(
+    String(formData.get('guardianEmail') ?? '').trim(),
+  )
+  if (!parsedEmail.success) return { error: parsedEmail.error.issues[0].message }
+  if (parsedEmail.data.toLowerCase() === user.email.toLowerCase()) {
+    return { error: 'The guardian email must be different from your own' }
+  }
+
+  const burst = await hit(`guardian:${user.id}`, 5, 24 * 60 * 60_000)
+  if (!burst.ok) {
+    return { error: 'We have sent a few already — check the spam folder, then try again tomorrow.' }
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { guardianEmail: parsedEmail.data },
+  })
+  after(sendGuardianRequest(user.id, user.name, parsedEmail.data))
+  return {}
 }
 
 /** Re-sends the confirmation link for the signed-in account. */

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { timingSafeEqual } from 'node:crypto'
 import { runMaintenance } from '@/lib/maintenance'
+import { reportError } from '@/lib/observability'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -33,7 +34,7 @@ export async function GET(req: Request) {
   try {
     return NextResponse.json({ ok: true, ...(await runMaintenance()) })
   } catch (err) {
-    console.error('[cron/maintenance]', err)
+    reportError('cron/maintenance', err)
     return NextResponse.json({ error: 'MAINTENANCE_FAILED' }, { status: 500 })
   }
 }

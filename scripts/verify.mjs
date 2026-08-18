@@ -56,14 +56,25 @@ console.log('\n[3] Locked chapter blocks access')
 await page.goto(`${BASE}/academic`, { waitUntil: 'domcontentloaded' })
 const locked = page.locator('article', { hasText: 'Linear Equations in One Variable' })
 await locked.locator('a', { hasText: 'Locked' }).click()
-// Signed out, /checkout bounces to /login and remembers where you were headed,
-// so the assertion is on the login hand-off, not on reaching checkout directly.
-await page.waitForURL('**/login**', { timeout: 15000 })
-check('sent to sign in, not the player', !page.url().includes('/learn/'))
+// /checkout is readable while signed out on purpose — see the comment on the
+// page itself: bouncing an anonymous visitor to /login meant asking them to
+// create an account before they had been shown a single price. So the locked
+// chapter leads to the plan, not to the lesson, and the *card* is what hands
+// off to sign-in.
+//
+// This assertion used to wait for **/login** and had been wrong since that
+// change was made. Nothing caught it because `npm run verify` never ran in CI.
+await page.waitForURL('**/checkout**', { timeout: 15000 })
+check('sent to the plan, not the player', !page.url().includes('/learn/'))
+check('checkout is reachable while signed out', page.url().includes('/checkout?course='), page.url())
+
+const buyCta = page.locator('a', { hasText: 'Sign in to buy' }).first()
+check('price is shown before sign-up is asked for', (await page.textContent('body')).includes('₹'))
+check('buying still needs an account', (await buyCta.count()) === 1)
 check(
-  'carries the checkout destination in ?next=',
-  decodeURIComponent(page.url()).includes('/checkout?course='),
-  page.url(),
+  'the sign-in link comes back to checkout',
+  decodeURIComponent((await buyCta.getAttribute('href')) ?? '').includes('/checkout?course='),
+  (await buyCta.getAttribute('href')) ?? '(no href)',
 )
 
 console.log('\n[4] Progress API rejects anonymous writes')

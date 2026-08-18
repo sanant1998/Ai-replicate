@@ -32,6 +32,21 @@ const PRACTICE = JSON.stringify([
   },
 ])
 
+// The guided tutor asks for one object matching a schema, so the mock has to
+// return that shape or the route's JSON.parse gets prose. Keyed off the marker
+// the guided prompt carries (see src/lib/guided.ts), which is in the prompt
+// precisely so the two cannot drift apart.
+const GUIDED = JSON.stringify({
+  onTopic: true,
+  matchedAnswerIndex: 1,
+  answer: 'Mock answer — this came from scripts/mock-openai.mjs, not from OpenAI.',
+  steps: [
+    'Step one: read what the question is actually asking.',
+    'Step two: pull the rule out of the topic material.',
+    'Step three: apply it and write the result.',
+  ],
+})
+
 function readBody(req) {
   return new Promise((resolve) => {
     let raw = ''
@@ -56,6 +71,7 @@ function pickText(body) {
     .filter((m) => m.role === 'system')
     .map((m) => m.content)
     .join('\n')
+  if (system.includes('GUIDED_PRACTICE_JSON')) return GUIDED
   if (system.includes('JSON only')) return PRACTICE
   return SHEET
 }
@@ -111,6 +127,13 @@ function respondStream(res) {
 }
 
 createServer(async (req, res) => {
+  // Readiness probe for CI, which has to know this is listening before it
+  // starts the app that will call it. Not part of the OpenAI surface.
+  if (req.url.startsWith('/healthz')) {
+    res.writeHead(200, { 'content-type': 'application/json' }).end('{"status":"ok"}')
+    return
+  }
+
   if (!req.url.includes('/chat/completions')) {
     res.writeHead(404).end()
     return

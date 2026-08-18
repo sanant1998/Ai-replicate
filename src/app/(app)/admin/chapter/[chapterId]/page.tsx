@@ -53,18 +53,32 @@ export default async function AdminChapterPage(props: PageProps<'/admin/chapter/
                     <span className="text-moss">video set</span>
                   ) : (
                     <span className="text-amber">in production</span>
+                  )}{' '}
+                  ·{' '}
+                  {t.content?.trim() ? (
+                    <span className="text-moss">guided material set</span>
+                  ) : (
+                    <span className="text-navy/40">no guided material</span>
                   )}
                 </span>
               </span>
-              <form action={deleteTopic}>
-                <input type="hidden" name="id" value={t.id} />
-                <button
-                  type="submit"
-                  className="shrink-0 rounded-xl border border-navy/15 px-3 py-1.5 text-sm font-bold text-navy/50 transition hover:border-ember hover:text-ember"
+              <span className="flex shrink-0 gap-2">
+                <Link
+                  href={`/admin/topic/${t.id}`}
+                  className="rounded-xl border border-navy/15 px-3 py-1.5 text-sm font-bold text-navy/60 transition hover:border-amber hover:text-navy-deep"
                 >
-                  Delete
-                </button>
-              </form>
+                  Material
+                </Link>
+                <form action={deleteTopic}>
+                  <input type="hidden" name="id" value={t.id} />
+                  <button
+                    type="submit"
+                    className="rounded-xl border border-navy/15 px-3 py-1.5 text-sm font-bold text-navy/50 transition hover:border-ember hover:text-ember"
+                  >
+                    Delete
+                  </button>
+                </form>
+              </span>
             </div>
           ))
         )}

@@ -41,7 +41,7 @@ export function ForgotForm() {
             type="email"
             required
             autoComplete="email"
-            className="w-full rounded-xl border border-navy/15 bg-white px-3 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber"
+            className="w-full rounded-xl border border-navy/15 bg-surface px-3 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber"
           />
         </label>
 

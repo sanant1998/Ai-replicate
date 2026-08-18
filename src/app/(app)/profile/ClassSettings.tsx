@@ -36,7 +36,7 @@ export function ClassSettings({
             name="boardId"
             value={boardId}
             onChange={(e) => setBoardId(e.target.value)}
-            className="w-full rounded-xl border border-navy/15 bg-white px-3 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber"
+            className="w-full rounded-xl border border-navy/15 bg-surface px-3 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber"
           >
             {boards.map((b) => (
               <option key={b.id} value={b.id}>
@@ -52,7 +52,7 @@ export function ClassSettings({
             name="classLevelId"
             key={boardId}
             defaultValue={boardChanged ? undefined : currentClassId}
-            className="w-full rounded-xl border border-navy/15 bg-white px-3 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber"
+            className="w-full rounded-xl border border-navy/15 bg-surface px-3 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber"
           >
             {classes.map((c) => (
               <option key={c.id} value={c.id}>

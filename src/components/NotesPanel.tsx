@@ -39,7 +39,7 @@ export function NotesPanel({ topicId, notes }: { topicId: string; notes: NoteRow
           rows={2}
           onFocus={stamp}
           placeholder="Jot something down — it gets stamped with the video time."
-          className="scroll-slim max-h-40 w-full resize-y rounded-2xl border border-navy/15 bg-white px-3.5 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber"
+          className="scroll-slim max-h-40 w-full resize-y rounded-2xl border border-navy/15 bg-surface px-3.5 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber"
         />
         <div className="mt-2 flex items-center justify-between gap-3">
           <span className="text-xs font-bold text-navy/40">
@@ -48,7 +48,7 @@ export function NotesPanel({ topicId, notes }: { topicId: string; notes: NoteRow
           <button
             type="submit"
             disabled={pending}
-            className="rounded-xl bg-navy px-4 py-2 text-sm font-bold text-white transition hover:bg-navy-deep disabled:opacity-60"
+            className="rounded-xl bg-navy-solid px-4 py-2 text-sm font-bold text-white transition hover:bg-navy-solid-deep disabled:opacity-60"
           >
             {pending ? 'Saving…' : 'Save note'}
           </button>

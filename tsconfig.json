@@ -11,6 +11,12 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    // The unit suite and scripts/ run through tsx, which resolves real file
+    // paths rather than a bundler's rewritten ones — so they import "../src/
+    // lib/quiz.ts" with the extension it actually has. Safe here because
+    // noEmit is on: nothing is written, so nothing can be written with an
+    // unresolvable specifier.
+    "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
     "incremental": true,
     "plugins": [

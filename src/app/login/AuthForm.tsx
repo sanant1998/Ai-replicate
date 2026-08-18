@@ -49,7 +49,7 @@ export function AuthForm({
               aria-pressed={mode === m}
               className={
                 mode === m
-                  ? 'rounded-xl bg-white px-3 py-2 text-sm font-extrabold text-navy-deep shadow-sm'
+                  ? 'rounded-xl bg-surface px-3 py-2 text-sm font-extrabold text-navy-deep shadow-sm'
                   : 'rounded-xl px-3 py-2 text-sm font-bold text-navy/50 transition hover:text-navy-deep'
               }
             >
@@ -87,7 +87,7 @@ export function AuthForm({
                 name="boardId"
                 value={boardId}
                 onChange={(e) => setBoardId(e.target.value)}
-                className="w-full rounded-xl border border-navy/15 bg-white px-3 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber"
+                className="w-full rounded-xl border border-navy/15 bg-surface px-3 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber"
               >
                 {boards.map((b) => (
                   <option key={b.id} value={b.id}>
@@ -101,7 +101,7 @@ export function AuthForm({
               <select
                 name="classLevelId"
                 key={boardId} /* reset the selection when the board changes */
-                className="w-full rounded-xl border border-navy/15 bg-white px-3 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber"
+                className="w-full rounded-xl border border-navy/15 bg-surface px-3 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber"
               >
                 {classes.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -111,6 +111,17 @@ export function AuthForm({
               </select>
             </label>
           </div>
+        )}
+
+        {mode === 'signup' && (
+          <Field
+            name="guardianEmail"
+            label="Parent or guardian's email (optional)"
+            type="email"
+            autoComplete="off"
+            required={false}
+            hint="We email them once to confirm they are happy for you to use PaperPath. You can add this later from your profile."
+          />
         )}
 
         {mode === 'signup' && (
@@ -199,11 +210,15 @@ function Field({
   label,
   type,
   autoComplete,
+  required = true,
+  hint,
 }: {
   name: string
   label: string
   type: string
   autoComplete: string
+  required?: boolean
+  hint?: string
 }) {
   return (
     <label className="block">
@@ -211,10 +226,16 @@ function Field({
       <input
         name={name}
         type={type}
-        required
+        required={required}
         autoComplete={autoComplete}
-        className="w-full rounded-xl border border-navy/15 bg-white px-3 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber"
+        aria-describedby={hint ? `${name}-hint` : undefined}
+        className="w-full rounded-xl border border-navy/15 bg-surface px-3 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber"
       />
+      {hint && (
+        <span id={`${name}-hint`} className="mt-1 block text-[13px] font-semibold text-navy/50">
+          {hint}
+        </span>
+      )}
     </label>
   )
 }

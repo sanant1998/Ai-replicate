@@ -54,6 +54,9 @@ enum ChatRole {
 enum ChatMode {
   TUTOR
   CAREER
+  /// Topic-locked, step-by-step practice. Answers come back structured rather
+  /// than as prose, and the model may only use material the staff supplied.
+  GUIDED
 }
 
 enum QuestionKind {
@@ -73,6 +76,16 @@ enum CreditReason {
   DAILY_GRANT
   TUTOR_MESSAGE
   MANUAL_ADJUSTMENT
+}
+
+enum RefundRequestStatus {
+  REQUESTED
+  APPROVED
+  DECLINED
+  /// The provider accepted the refund but has not confirmed it yet. The
+  /// subscription is only cancelled when the refund webhook arrives, so this
+  /// state exists to stop a second approval being sent in the meantime.
+  SENT
 }
 
 // ---------------------------------------------------------------------------
@@ -106,6 +119,12 @@ model ClassLevel {
   board   Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
   courses Course[]
   users   User[]
+  /// Bundle subscriptions scoped to this class. Restricted rather than
+  /// cascading: `classLevelId` used to be a bare string with no constraint at
+  /// all, so deleting a class left live subscriptions pointing at nothing —
+  /// rows that granted access to a class the catalog no longer had.
+  subscriptions Subscription[]
+  payments      Payment[]
 
   @@unique([boardId, slug])
   @@index([boardId, sortKey])
@@ -136,6 +155,7 @@ model Course {
   subject       Subject        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   chapters      Chapter[]
   subscriptions Subscription[]
+  payments      Payment[]
 
   @@unique([classLevelId, subjectId])
   @@index([classLevelId, sortKey])
@@ -171,13 +191,45 @@ model Topic {
   /// HLS manifest or MP4. Null while the lesson is still being produced.
   videoUrl    String?
   posterUrl   String?
+  /// The only material the guided tutor may answer from for this topic. Null or
+  /// empty means the topic is not offered for guided practice at all — which is
+  /// the point: a topic nobody has written material for cannot be grounded, and
+  /// an ungrounded "grounded" answer is the failure this whole mode exists to
+  /// prevent.
+  content     String?
 
-  chapter  Chapter    @relation(fields: [chapterId], references: [id], onDelete: Cascade)
-  progress Progress[]
-  notes    Note[]
+  chapter  Chapter       @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  progress     Progress[]
+  notes        Note[]
+  answers      TopicAnswer[]
+  chatSessions ChatSession[]
 
   @@unique([chapterId, index])
   @@index([chapterId, index])
+}
+
+/// A question with the answer the client wants given for it, word for word.
+///
+/// This is what makes "exact answer" a fact rather than a hope. The model is
+/// shown these pairs and asked which one the student is asking; when it names
+/// one, the server substitutes the stored answer for whatever the model wrote.
+/// The model's remaining job is the explanation, where being fluent is what we
+/// actually want from it.
+model TopicAnswer {
+  id        String   @id @default(cuid())
+  topicId   String
+  index     Int
+  question  String
+  answer    String
+  /// Pre-written steps, one per element. Empty means the model writes them.
+  steps     String[] @default([])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([topicId, index])
+  @@index([topicId, index])
 }
 
 // ---------------------------------------------------------------------------
@@ -292,11 +344,31 @@ model User {
   creditsGrantedOn DateTime?
   /// When the account holder confirmed parent/guardian permission. Null for
   /// accounts created before the consent gate existed.
+  ///
+  /// This is the child ticking a box, which is not verifiable consent under the
+  /// DPDP Act 2023 — a box is exactly as easy for the child to tick as it is
+  /// for the parent. `guardianConsentAt` below is the half that involves the
+  /// parent at all.
   consentAcceptedAt DateTime?
+  /// The address a consent request was sent to, if one was given at signup.
+  guardianEmail     String?
+  /// When the guardian confirmed, by following a link mailed to that address.
+  /// Reaching an inbox the child named is weaker than a government ID check and
+  /// stronger than a checkbox; whether it satisfies DPDP is a question for a
+  /// lawyer, not for this comment.
+  guardianConsentAt DateTime?
   /// When the address was proved reachable by following a mailed link. Null
   /// means unverified — the account works, but with a reduced credit cap and a
   /// banner, so a typo'd or borrowed address cannot farm the free allowance.
   emailVerifiedAt   DateTime?
+  /// A test account: the guided-practice screen and nothing else.
+  ///
+  /// Not a Role, because it is orthogonal to one — this is still a STUDENT, and
+  /// every role check elsewhere should keep treating it as one. What it changes
+  /// is the surface: the navigation, the pages the layout will render, and the
+  /// tutor routes that would otherwise let a tester wander into the paid
+  /// product they are not here to test.
+  testMode          Boolean  @default(false)
   /// Bumped to invalidate every session token already issued for this user.
   /// Session cookies carry the value they were signed with, so a mismatch on
   /// the next request logs the holder out — that is what makes "sign out
@@ -317,6 +389,12 @@ model User {
   quizAttempts  QuizAttempt[]
   notes         Note[]
   bookmarks     Bookmark[]
+  refundRequests RefundRequest[]
+  guardianTokens GuardianConsentToken[]
+  /// Children this account can see the progress of.
+  children      ParentLink[]           @relation("ParentOf")
+  /// Adults who can see this account's progress.
+  guardians     ParentLink[]           @relation("ChildOf")
 
   @@index([email])
 }
@@ -334,6 +412,41 @@ model PasswordResetToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+/// Single-use, time-limited parent/guardian consent. Same shape as the other
+/// two token tables, for the same reason: the raw value travels through email
+/// and is a bearer credential, so only its hash is stored.
+model GuardianConsentToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// An adult who may see one child's progress.
+///
+/// Read-only by design, and separate from the child's own login: a parent
+/// following along must not be able to spend the child's tutor credits, take
+/// their quizzes, or read their tutor conversations, which is why the family
+/// view queries progress and attempts rather than signing anyone in as anyone.
+model ParentLink {
+  id        String   @id @default(cuid())
+  parentId  String
+  studentId String
+  createdAt DateTime @default(now())
+
+  parent  User @relation("ParentOf", fields: [parentId], references: [id], onDelete: Cascade)
+  student User @relation("ChildOf", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([parentId, studentId])
+  @@index([studentId])
 }
 
 /// Single-use, time-limited email confirmation. Stored and compared exactly like
@@ -366,8 +479,13 @@ model Subscription {
   createdAt    DateTime           @default(now())
 
   user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course  Course?  @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  payment Payment?
+  /// Restrict, not Cascade. Deleting a course used to silently delete the
+  /// subscriptions people had paid for it — the admin panel guards against it,
+  /// but the database should refuse it too, because a guard is a policy and a
+  /// constraint is a fact.
+  course     Course?     @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  classLevel ClassLevel? @relation(fields: [classLevelId], references: [id], onDelete: Restrict)
+  payment    Payment?
 
   @@index([userId, status])
   @@index([courseId])
@@ -401,10 +519,50 @@ model Payment {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refundRequests RefundRequest[]
   subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  /// SetNull rather than Restrict: a payment is a financial record and has to
+  /// survive the catalog being reorganised, but it must not keep pointing at a
+  /// course or class that no longer exists.
+  course       Course?       @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  classLevel   ClassLevel?   @relation(fields: [classLevelId], references: [id], onDelete: SetNull)
 
   @@index([userId, status])
+  @@index([courseId])
+  @@index([classLevelId])
+}
+
+/// A student asking for the refund the terms promise.
+///
+/// /terms offers a full refund within seven days of purchase, and there was no
+/// way to ask for one: the only route was for an operator to notice an email
+/// and issue it by hand in the Razorpay dashboard. This is the record of the
+/// ask, so a promise made in writing has somewhere to land — and so a decision
+/// on it is auditable rather than a message in somebody's inbox.
+///
+/// Approving does not itself take access away. It sends the refund to the
+/// provider; the refund webhook is still the only thing that revokes, which
+/// keeps one path into `revokeForPayment` rather than two.
+model RefundRequest {
+  id        String              @id @default(cuid())
+  paymentId String
+  userId    String
+  reason    String
+  status    RefundRequestStatus @default(REQUESTED)
+  /// What the staff member decided and why — shown back to the student.
+  decisionNote String?
+  decidedById  String?
+  decidedAt    DateTime?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+  @@index([paymentId])
 }
 
 model Progress {
@@ -431,6 +589,8 @@ model ChatSession {
   userId    String
   /// Scopes the system prompt to a chapter. Null = general "Ask Questions" session.
   chapterId String?
+  /// Set for GUIDED sessions: the one topic this conversation may draw on.
+  topicId   String?
   /// Which system prompt this session runs under. CAREER sessions are kept
   /// separate so career advice and homework help don't bleed into each other.
   mode      ChatMode @default(TUTOR)
@@ -440,16 +600,23 @@ model ChatSession {
 
   user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   chapter  Chapter?      @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  topic    Topic?        @relation(fields: [topicId], references: [id], onDelete: SetNull)
   messages ChatMessage[]
 
   @@index([userId, updatedAt])
+  @@index([userId, topicId, updatedAt])
 }
 
 model ChatMessage {
   id        String   @id @default(cuid())
   sessionId String
   role      ChatRole
+  /// The answer itself. In a GUIDED session this is the headline answer only —
+  /// short, and exactly what the client's answer key says where there is one.
   content   String
+  /// The working, one step per element, revealed one at a time by the guided
+  /// UI. Empty for every other mode.
+  steps     String[] @default([])
   createdAt DateTime @default(now())
 
   session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)

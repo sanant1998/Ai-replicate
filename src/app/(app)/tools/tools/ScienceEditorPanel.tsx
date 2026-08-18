@@ -314,7 +314,7 @@ export default function ScienceEditorPanel({ onClose }: { onClose: () => void })
               aria-pressed={view === mode}
               className={clsx(
                 'rounded-lg px-2.5 py-1 text-xs font-extrabold capitalize transition',
-                view === mode ? 'bg-navy text-white' : 'opacity-60 hover:opacity-100',
+                view === mode ? 'bg-navy-solid text-white' : 'opacity-60 hover:opacity-100',
               )}
             >
               {mode}

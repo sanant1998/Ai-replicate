@@ -56,15 +56,21 @@ export default async function AdminPage() {
           <div className="flex gap-2">
             <Link
               href="/admin/catalog"
-              className="min-h-10 rounded-xl border border-navy/15 bg-white px-4 py-2 text-sm font-extrabold text-navy/65 transition hover:border-amber"
+              className="min-h-10 rounded-xl border border-navy/15 bg-surface px-4 py-2 text-sm font-extrabold text-navy/65 transition hover:border-amber"
             >
               Classes &amp; subjects
             </Link>
             <Link
               href="/admin/people"
-              className="min-h-10 rounded-xl border border-navy/15 bg-white px-4 py-2 text-sm font-extrabold text-navy/65 transition hover:border-amber"
+              className="min-h-10 rounded-xl border border-navy/15 bg-surface px-4 py-2 text-sm font-extrabold text-navy/65 transition hover:border-amber"
             >
               People &amp; roles
+            </Link>
+            <Link
+              href="/admin/payments"
+              className="min-h-10 rounded-xl border border-navy/15 bg-surface px-4 py-2 text-sm font-extrabold text-navy/65 transition hover:border-amber"
+            >
+              Payments &amp; refunds
             </Link>
           </div>
         )}

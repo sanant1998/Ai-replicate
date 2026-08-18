@@ -3,7 +3,10 @@ import { mkdirSync } from 'node:fs'
 
 mkdirSync('.verify-shots', { recursive: true })
 
-const BASE = 'http://127.0.0.1:3001'
+// Same knob as every other suite. It used to be hard-coded to a different port
+// from the rest, so pointing the others at a running app left this one talking
+// to nothing.
+const BASE = process.env.VERIFY_BASE ?? 'http://localhost:3000'
 const fails = []
 const check = (name, cond, detail = '') => {
   console.log(cond ? `  ✓ ${name}` : `  ✗ ${name} ${detail}`)

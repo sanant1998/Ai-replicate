@@ -105,7 +105,7 @@ export default async function CoursesPage() {
                       <li key={course.id}>
                         <Link
                           href={`/academic?class=${classLevel.slug}&subject=${course.subject.slug}`}
-                          className="flex h-full flex-col rounded-2xl border border-navy/10 bg-white p-4 transition hover:-translate-y-0.5 hover:border-amber motion-reduce:hover:translate-y-0"
+                          className="flex h-full flex-col rounded-2xl border border-navy/10 bg-surface p-4 transition hover:-translate-y-0.5 hover:border-amber motion-reduce:hover:translate-y-0"
                         >
                           <span className="flex items-center gap-2.5">
                             <span
@@ -149,7 +149,7 @@ export default async function CoursesPage() {
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Link
                     href={`/academic?class=${classLevel.slug}`}
-                    className="rounded-full border border-navy/15 bg-white px-5 py-2.5 text-sm font-extrabold text-navy-deep transition hover:border-amber"
+                    className="rounded-full border border-navy/15 bg-surface px-5 py-2.5 text-sm font-extrabold text-navy-deep transition hover:border-amber"
                   >
                     Browse chapters
                   </Link>

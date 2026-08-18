@@ -75,7 +75,7 @@ export default function KetcherCanvas({ onClose }: { onClose: () => void }) {
             <ol className="space-y-2">
               {FEATURES.map((f, i) => (
                 <li key={f} className="flex items-center gap-2.5 text-sm font-bold">
-                  <span className="grid size-6 shrink-0 place-items-center rounded-full bg-navy text-[11px] text-white">
+                  <span className="grid size-6 shrink-0 place-items-center rounded-full bg-navy-solid text-[11px] text-white">
                     {i + 1}
                   </span>
                   {f}
@@ -105,7 +105,7 @@ export default function KetcherCanvas({ onClose }: { onClose: () => void }) {
             type="button"
             onClick={readSmiles}
             disabled={!ready}
-            className="min-h-11 w-full rounded-xl bg-navy text-sm font-extrabold text-white transition hover:brightness-110 disabled:opacity-45"
+            className="min-h-11 w-full rounded-xl bg-navy-solid text-sm font-extrabold text-white transition hover:brightness-110 disabled:opacity-45"
           >
             {ready ? 'Get SMILES' : 'Starting the engine…'}
           </button>
@@ -161,7 +161,7 @@ export default function KetcherCanvas({ onClose }: { onClose: () => void }) {
     >
       {/* Ketcher measures its container, so the height has to be explicit. */}
       <div
-        className="ketcher-frame h-[calc(100dvh-8rem)] min-h-[30rem] overflow-hidden rounded-2xl bg-white"
+        className="ketcher-frame h-[calc(100dvh-8rem)] min-h-[30rem] overflow-hidden rounded-2xl bg-surface"
         style={{ border: '1px solid var(--shell-line)' }}
       >
         <Editor

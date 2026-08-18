@@ -10,6 +10,7 @@ import { consumeResetToken, issueResetToken } from '@/lib/reset'
 import { createSession, revokeAllSessions } from '@/lib/session'
 import { actionIp, hit, hitIp } from '@/lib/rate-limit'
 import { appOrigin } from '@/lib/origin'
+import { reportError } from '@/lib/observability'
 
 export type ResetState = { error?: string; sent?: boolean }
 
@@ -35,7 +36,7 @@ export async function requestReset(_prev: ResetState, formData: FormData): Promi
     // of when the mail actually leaves.
     after(
       sendPasswordReset(user.email, url).catch((err) => {
-        console.error('[reset] delivery failed', err)
+        reportError('password-reset/mail', err)
       }),
     )
   }

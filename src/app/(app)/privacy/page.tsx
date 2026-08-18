@@ -80,6 +80,18 @@ export default function PrivacyPage() {
           record when that was given. We run no advertising and no behavioural tracking of any kind.
         </p>
         <p>
+          A student can also give us their parent or guardian&apos;s email address, at signup or later
+          from their profile. We email that address once, explaining what we store, and record the
+          permission only when the guardian follows the link themselves.
+        </p>
+        <p>
+          A guardian who confirms may choose to open an account of their own and see how their child
+          is getting on. That view is deliberately limited to lessons watched, quiz scores and how
+          many tutor sessions there have been — <strong>not</strong> the contents of those
+          conversations, and not the child&apos;s notes. A tutor a parent is reading over the
+          shoulder of is not somewhere a child will admit they do not understand something.
+        </p>
+        <p>
           A parent or guardian may write to <strong>privacy@paperpath.dev</strong> at any time to see what
           we hold about their child, correct it, or have the account and its data deleted.
         </p>

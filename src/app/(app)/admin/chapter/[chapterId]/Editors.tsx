@@ -6,7 +6,7 @@ import { saveQuestion, saveTopic, type AdminState } from '../../actions'
 const initial: AdminState = {}
 
 const field =
-  'w-full rounded-xl border border-navy/15 bg-white px-3 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber'
+  'w-full rounded-xl border border-navy/15 bg-surface px-3 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber'
 
 function Feedback({ state, noun }: { state: AdminState; noun: string }) {
   return (
@@ -37,7 +37,7 @@ export function TopicEditor({ chapterId, nextIndex }: { chapterId: string; nextI
       <input type="hidden" name="chapterId" value={chapterId} />
       <p className="text-sm font-extrabold tracking-wider text-navy/45">ADD A TOPIC</p>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-[5rem_1fr_7rem]">
+      <div className="mt-3 grid gap-3 sm:grid-cols-[5rem_1fr_8rem_7rem]">
         <label className="block">
           <span className="mb-1 block text-sm font-bold text-navy-deep">No.</span>
           <input name="index" type="number" min={1} defaultValue={nextIndex} required className={field} />
@@ -45,6 +45,13 @@ export function TopicEditor({ chapterId, nextIndex }: { chapterId: string; nextI
         <label className="block">
           <span className="mb-1 block text-sm font-bold text-navy-deep">Title</span>
           <input name="title" required placeholder="Introduction" className={field} />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-sm font-bold text-navy-deep">Kind</span>
+          <select name="kind" defaultValue="VIDEO" className={field}>
+            <option value="VIDEO">Video</option>
+            <option value="ACTIVITY">Activity</option>
+          </select>
         </label>
         <label className="block">
           <span className="mb-1 block text-sm font-bold text-navy-deep">Seconds</span>
@@ -57,6 +64,13 @@ export function TopicEditor({ chapterId, nextIndex }: { chapterId: string; nextI
           Video URL — HLS manifest or MP4 (leave blank while in production)
         </span>
         <input name="videoUrl" type="url" placeholder="https://cdn.example.com/lesson.m3u8" className={field} />
+      </label>
+
+      <label className="mt-3 block">
+        <span className="mb-1 block text-sm font-bold text-navy-deep">
+          Poster image URL (optional) — shown before playback starts
+        </span>
+        <input name="posterUrl" type="url" placeholder="https://cdn.example.com/lesson.jpg" className={field} />
       </label>
 
       <Feedback state={state} noun="Topic" />
@@ -85,7 +99,7 @@ export function QuestionEditor({ chapterId, nextIndex }: { chapterId: string; ne
       <input type="hidden" name="chapterId" value={chapterId} />
       <p className="text-sm font-extrabold tracking-wider text-navy/45">ADD A QUESTION</p>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-[5rem_1fr_6rem]">
+      <div className="mt-3 grid gap-3 sm:grid-cols-[5rem_1fr_8rem_6rem]">
         <label className="block">
           <span className="mb-1 block text-sm font-bold text-navy-deep">No.</span>
           <input name="index" type="number" min={1} defaultValue={nextIndex} required className={field} />
@@ -101,6 +115,14 @@ export function QuestionEditor({ chapterId, nextIndex }: { chapterId: string; ne
             <option value="MCQ">Multiple choice</option>
             <option value="NUMERIC">Numeric answer</option>
             <option value="SHORT">Short answer</option>
+          </select>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-sm font-bold text-navy-deep">Difficulty</span>
+          <select name="difficulty" defaultValue="1" className={field}>
+            <option value="1">Easy</option>
+            <option value="2">Medium</option>
+            <option value="3">Hard</option>
           </select>
         </label>
         <label className="block">

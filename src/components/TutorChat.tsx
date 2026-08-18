@@ -157,7 +157,7 @@ export function TutorChat({
                 <button
                   key={s}
                   onClick={() => send(s)}
-                  className="rounded-2xl border border-navy/10 bg-white px-4 py-2.5 text-left text-sm font-semibold text-navy-deep transition hover:border-amber"
+                  className="rounded-2xl border border-navy/10 bg-surface px-4 py-2.5 text-left text-sm font-semibold text-navy-deep transition hover:border-amber"
                 >
                   {s}
                 </button>
@@ -175,7 +175,7 @@ export function TutorChat({
               className={clsx(
                 'max-w-[85%] rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed',
                 t.role === 'USER'
-                  ? 'whitespace-pre-wrap bg-navy font-semibold text-white'
+                  ? 'whitespace-pre-wrap bg-navy-solid font-semibold text-white'
                   : 'bg-navy/6 font-medium text-navy-deep',
               )}
             >
@@ -217,7 +217,7 @@ export function TutorChat({
           rows={1}
           placeholder={left > 0 ? 'Ask a question…' : 'No credits left today'}
           disabled={left <= 0}
-          className="scroll-slim max-h-40 min-h-11 flex-1 resize-y rounded-2xl border border-navy/15 bg-white px-4 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber disabled:opacity-60"
+          className="scroll-slim max-h-40 min-h-11 flex-1 resize-y rounded-2xl border border-navy/15 bg-surface px-4 py-2.5 font-semibold text-navy-deep outline-none transition focus:border-amber disabled:opacity-60"
         />
         <button
           type="submit"

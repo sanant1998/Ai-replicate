@@ -216,7 +216,7 @@ export function ScientificCalculator({ onClose }: { onClose: () => void }) {
     >
       <ShellPanel className="mx-auto max-w-2xl">
         <div>
-          <div className="rounded-2xl bg-navy-deep px-4 py-3 text-right">
+          <div className="rounded-2xl bg-navy-solid-deep px-4 py-3 text-right">
           <label className="sr-only" htmlFor="calc-expression">
             Expression
           </label>
@@ -254,7 +254,7 @@ export function ScientificCalculator({ onClose }: { onClose: () => void }) {
           <div
             role="group"
             aria-label="Angle unit"
-            className="inline-flex rounded-xl border border-navy/15 bg-white p-0.5"
+            className="inline-flex rounded-xl border border-navy/15 bg-surface p-0.5"
           >
             {(['deg', 'rad'] as const).map((mode) => (
               <button
@@ -264,7 +264,7 @@ export function ScientificCalculator({ onClose }: { onClose: () => void }) {
                 aria-pressed={angleMode === mode}
                 className={clsx(
                   'rounded-lg px-3 py-1.5 text-xs font-extrabold uppercase transition',
-                  angleMode === mode ? 'bg-navy text-white' : 'text-navy/55 hover:text-navy',
+                  angleMode === mode ? 'bg-navy-solid text-white' : 'text-navy/55 hover:text-navy',
                 )}
               >
                 {mode}
@@ -286,10 +286,10 @@ export function ScientificCalculator({ onClose }: { onClose: () => void }) {
               className={clsx(
                 'min-h-11 rounded-xl text-sm font-extrabold transition active:scale-95 motion-reduce:active:scale-100',
                 key.tone === 'accent' && 'flame-gradient text-white shadow-sm shadow-ember/25',
-                key.tone === 'operator' && 'bg-navy text-white hover:brightness-125',
+                key.tone === 'operator' && 'bg-navy-solid text-white hover:brightness-125',
                 key.tone === 'function' && 'bg-navy/10 text-navy-deep hover:bg-navy/15',
                 (!key.tone || key.tone === 'default') &&
-                  'bg-white text-navy-deep shadow-sm hover:bg-navy/5',
+                  'bg-surface text-navy-deep shadow-sm hover:bg-navy/5',
               )}
             >
               {key.label}

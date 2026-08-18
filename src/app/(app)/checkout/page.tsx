@@ -117,7 +117,7 @@ export default async function CheckoutPage(props: PageProps<'/checkout'>) {
       ) : mockOn ? (
         <p className="rounded-2xl bg-amber/15 px-5 py-4 text-sm font-semibold text-navy/65">
           <strong className="font-extrabold text-navy-deep">Development mode:</strong> no Razorpay
-          keys are set, and <code className="rounded bg-white px-1">ALLOW_MOCK_CHECKOUT=1</code> is
+          keys are set, and <code className="rounded bg-surface px-1">ALLOW_MOCK_CHECKOUT=1</code> is
           on, so buying grants access immediately without charging anything. This path is compiled
           out of production builds.
         </p>
