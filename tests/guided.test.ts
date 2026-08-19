@@ -135,6 +135,72 @@ describe('resolveAnswer', () => {
     assert.deepEqual(out.steps, ['a'])
   })
 
+  // Two layers, and which one answered has to survive the fold. A substituted
+  // answer is the client material whatever the model said, an unmatched one
+  // keeps the model verdict, and a reply from before the field existed reads as
+  // material because that was the only kind there was.
+  it('reports the material as the source when the answer key was substituted', () => {
+    const out = resolveAnswer(
+      { onTopic: true, matchedAnswerIndex: 1, source: 'general', answer: 'mine', steps: [] },
+      'Topic',
+      key,
+    )
+    assert.equal(out.source, 'material')
+    assert.equal(out.answer, '16')
+  })
+
+  it('keeps a general answer general when nothing in the key matched', () => {
+    const out = resolveAnswer(
+      { onTopic: true, matchedAnswerIndex: null, source: 'general', answer: 'A mole is 6.022e23 particles.', steps: ['a'] },
+      'Topic',
+      key,
+    )
+    assert.equal(out.source, 'general')
+    assert.equal(out.answer, 'A mole is 6.022e23 particles.')
+  })
+
+  it('reads a reply with no source at all as material', () => {
+    const out = resolveAnswer(
+      { onTopic: true, matchedAnswerIndex: null, answer: 'x', steps: [] },
+      'Topic',
+      key,
+    )
+    assert.equal(out.source, 'material')
+  })
+
+  // The bug this pins: "Explain this step again" sent an ordinary message, the
+  // model matched the same answer-key entry the student was already looking at,
+  // and substitution handed back the identical answer and identical steps. It
+  // looked like a deployment fault because it only shows up where a topic has an
+  // answer key — the topics used in local testing had none, so the model's own
+  // re-wording came through and the button appeared to work.
+  it('keeps the model wording when substitution is off, so a re-explanation differs', () => {
+    const again = resolveAnswer(
+      {
+        onTopic: true,
+        matchedAnswerIndex: 1,
+        answer: 'Speed is how far it went divided by how long it took.',
+        steps: ['Distance is 1.50 m.', 'Time is 1.23e-5 s.'],
+      },
+      'Topic',
+      key,
+      { substitute: false },
+    )
+    assert.notEqual(again.answer, key[0].answer)
+    assert.deepEqual(again.steps, ['Distance is 1.50 m.', 'Time is 1.23e-5 s.'])
+  })
+
+  it('still refuses off-topic when substitution is off', () => {
+    const out = resolveAnswer(
+      { onTopic: false, matchedAnswerIndex: null, answer: 'anything', steps: ['a'] },
+      'Topic',
+      key,
+      { substitute: false },
+    )
+    assert.equal(out.onTopic, false)
+    assert.deepEqual(out.steps, [])
+  })
+
   it('replaces a refusal with the one wording, whatever the model wrote', () => {
     const out = resolveAnswer(
       { onTopic: false, matchedAnswerIndex: 1, answer: 'I think it is 16 actually', steps: ['a'] },

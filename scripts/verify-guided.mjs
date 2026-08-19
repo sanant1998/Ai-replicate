@@ -21,7 +21,18 @@ const PASSWORD = process.env.VERIFY_TESTER_PASSWORD ?? 'yashika@123'
 // "whatever is first in the list", because the exact-answer check needs a topic
 // that actually has an answer key — and which topic sorts first changes every
 // time somebody adds content. `npm run db:import-topic` prints the id.
-const TOPIC = process.env.VERIFY_TOPIC_ID ?? 'cmsyasvpo0001z8w2plfxu8kd'
+// No default. The id that used to sit here outlived the content it named, and
+// a stale id fails as a 404 on every case at once, which reads like the suite
+// is broken rather than like it is pointed at nothing.
+const TOPIC = process.env.VERIFY_TOPIC_ID
+if (!TOPIC) {
+  console.error(
+    'Set VERIFY_TOPIC_ID to the topic to exercise.
+' +
+      'List them with: npm run db:remove-topic -- --list',
+  )
+  process.exit(1)
+}
 const KEY_QUESTION =
   'A molecule Q is ionised by electron impact in a TOF mass spectrometer. The Q+ ion has a kinetic energy of 2.09 x 10^-15 J and takes 1.23 x 10^-5 s to reach the detector. The flight tube is 1.50 m long. Calculate the relative molecular mass of Q.'
 // The stored string, byte for byte. Compared against what the API returns

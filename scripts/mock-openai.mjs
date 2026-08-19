@@ -39,12 +39,21 @@ const PRACTICE = JSON.stringify([
 const GUIDED = JSON.stringify({
   onTopic: true,
   matchedAnswerIndex: 1,
+  source: 'material',
   answer: 'Mock answer — this came from scripts/mock-openai.mjs, not from OpenAI.',
   steps: [
     'Step one: read what the question is actually asking.',
     'Step two: pull the rule out of the topic material.',
     'Step three: apply it and write the result.',
   ],
+})
+
+// The admin panel names a pasted topic from its material, and reads the reply
+// back through a schema too. Keyed off the marker in src/lib/naming.ts for the
+// same reason as the guided one.
+const NAMES = JSON.stringify({
+  topicTitle: 'Mock topic name from scripts/mock-openai.mjs',
+  chapterTitle: 'Mock chapter name from scripts/mock-openai.mjs',
 })
 
 function readBody(req) {
@@ -72,6 +81,7 @@ function pickText(body) {
     .map((m) => m.content)
     .join('\n')
   if (system.includes('GUIDED_PRACTICE_JSON')) return GUIDED
+  if (system.includes('TOPIC_NAMING_JSON')) return NAMES
   if (system.includes('JSON only')) return PRACTICE
   return SHEET
 }

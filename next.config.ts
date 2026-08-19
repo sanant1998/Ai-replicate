@@ -9,6 +9,14 @@ const nextConfig: NextConfig = {
   // and the browser logs 403s. Both spellings name this machine; listing them
   // keeps that noise out of the console-error check. Dev-only setting.
   allowedDevOrigins: ['127.0.0.1', 'localhost'],
+  experimental: {
+    serverActions: {
+      // Topic material is pasted whole and has no length cap of its own, so the
+      // 1MB default would be the cap — and it would surface as a failed request
+      // rather than a message. A page of notes is nowhere near this.
+      bodySizeLimit: '10mb',
+    },
+  },
   turbopack: {
     // Pin the workspace root. Without it Turbopack infers one from the nearest
     // lockfile, which changes if a stray lockfile appears or disappears above

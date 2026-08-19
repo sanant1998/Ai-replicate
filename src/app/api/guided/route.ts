@@ -21,9 +21,37 @@ const Body = z.object({
   topicId: z.string().min(1),
   sessionId: z.string().optional(),
   message: z.string().min(1).max(2000),
+  // Which button was pressed. Absent means the student typed a question, which
+  // is what every client before this field did, so the default has to be `ask`.
+  intent: z.enum(['ask', 'explain']).default('ask'),
 })
 
-const MODEL = process.env.OPENAI_MODEL ?? 'gpt-4o-mini'
+const MODEL = process.env.OPENAI_MODEL ?? 'gpt-4o'
+
+/**
+ * Reasoning models take different arguments, and get them wrong silently.
+ *
+ * They reject `temperature` outright, and they spend `max_completion_tokens`
+ * on reasoning before writing a character of the answer — so the 900 that was
+ * generous for gpt-4o came back as an empty message and a 502, with nothing in
+ * the error to say why. Detected by name because that is the only signal the
+ * API gives before the call.
+ */
+const REASONING = /^(gpt-5|o[1-9])/.test(MODEL)
+
+/**
+ * How hard a reasoning model thinks before answering.
+ *
+ * "low" scored the same as "medium" on the grounding suite and took half as
+ * long, and a student watching a spinner is the cost that is actually being
+ * paid here. Raise it if a topic starts producing sloppy working.
+ */
+const EFFORTS = ['minimal', 'low', 'medium', 'high'] as const
+type Effort = (typeof EFFORTS)[number]
+const configured = process.env.OPENAI_REASONING_EFFORT
+const REASONING_EFFORT: Effort = EFFORTS.includes(configured as Effort)
+  ? (configured as Effort)
+  : 'low'
 
 /**
  * How much of the answer key one request may carry.
@@ -64,7 +92,7 @@ export async function POST(req: Request) {
 
   const parsed = Body.safeParse(await req.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
-  const { message, topicId } = parsed.data
+  const { message, topicId, intent } = parsed.data
 
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: session.uid },
@@ -169,6 +197,7 @@ export async function POST(req: Request) {
     topicTitle: topic.title,
     content: topic.content,
     answerKey,
+    intent,
   })
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -177,7 +206,21 @@ export async function POST(req: Request) {
     const completion = await openai.chat.completions.create(
       {
         model: MODEL,
-        max_completion_tokens: 900,
+        // Headroom for a reasoning model to think in. A non-reasoning model is
+        // billed on what it writes, not on the ceiling, so the larger number
+        // costs nothing where it is not needed.
+        max_completion_tokens: REASONING ? 8000 : 900,
+        ...(REASONING
+          ? { reasoning_effort: REASONING_EFFORT }
+          : {
+              // Nothing here benefits from sampling. Every turn makes the same
+              // two decisions — is this mine to answer, and does the material
+              // cover it — and at the default temperature the model returned
+              // different verdicts for the same question on consecutive runs,
+              // which reads to a student as the tutor changing its mind about
+              // what it is allowed to teach.
+              temperature: 0,
+            }),
         // Not streamed, deliberately. A stepped answer is only useful once it
         // is whole — the interface hands the steps over one at a time, so the
         // student would spend the stream watching text they are not allowed to
@@ -198,10 +241,25 @@ export async function POST(req: Request) {
       { signal: req.signal },
     )
 
-    const raw = completion.choices[0]?.message?.content
-    if (!raw) throw new Error('The tutor returned nothing.')
+    const choice = completion.choices[0]
+    const raw = choice?.message?.content
+    if (!raw) {
+      // Worth naming: an empty message from a reasoning model almost always
+      // means the token ceiling was spent on reasoning, and the generic
+      // "returned nothing" sent people looking at the prompt instead.
+      throw new Error(
+        choice?.finish_reason === 'length'
+          ? `${MODEL} hit max_completion_tokens before writing an answer`
+          : 'The tutor returned nothing.',
+      )
+    }
 
-    const reply = resolveAnswer(JSON.parse(raw) as GuidedAnswer, topic.title, answerKey)
+    // A re-explanation keeps the model's own wording. The verbatim answer is
+    // already in the transcript above it; repeating it is what the student just
+    // said did not work.
+    const reply = resolveAnswer(JSON.parse(raw) as GuidedAnswer, topic.title, answerKey, {
+      substitute: intent !== 'explain',
+    })
 
     const saved = await prisma.chatMessage.create({
       data: {
@@ -222,6 +280,11 @@ export async function POST(req: Request) {
       answer: reply.answer,
       steps: reply.steps,
       onTopic: reply.onTopic,
+      // Which layer answered: the uploaded material, or the model's own
+      // knowledge of the topic. Not stored on the message — it is here so the
+      // grounding suite can tell a material answer from a general one without
+      // reading the prose, which is the only way to check the two-layer rule.
+      source: reply.source,
       charged,
     })
   } catch (err) {

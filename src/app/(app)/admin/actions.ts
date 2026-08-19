@@ -1,9 +1,12 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import OpenAI from 'openai'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireStaff } from '@/lib/admin'
+import { hit } from '@/lib/rate-limit'
+import { NAMING_SCHEMA, namingPrompt, parseNames } from '@/lib/naming'
 
 export type AdminState = { error?: string; saved?: boolean }
 
@@ -237,7 +240,14 @@ export async function deleteQuestion(formData: FormData) {
  */
 const TopicMaterialInput = z.object({
   topicId: z.string().min(1),
-  content: z.string().trim().max(20_000, 'That is too long — split it across topics.'),
+  // Deliberately uncapped: a topic's notes are as long as the client's notes
+  // are, and a cap here reads as "your syllabus does not fit". The practical
+  // ceiling is `serverActions.bodySizeLimit` in next.config.ts, raised to match.
+  content: z.string().trim(),
+  // The names shown beside the box. Both optional so an older client — or a
+  // save made before the fields existed — still just saves the material.
+  title: z.string().trim().min(2, 'Give the topic a name').max(200).optional(),
+  chapterTitle: z.string().trim().min(2, 'Give the chapter a name').max(200).optional(),
 })
 
 export async function saveTopicMaterial(
@@ -248,22 +258,117 @@ export async function saveTopicMaterial(
     const parsed = TopicMaterialInput.safeParse({
       topicId: formData.get('topicId'),
       content: formData.get('content') ?? '',
+      title: formData.get('title') || undefined,
+      chapterTitle: formData.get('chapterTitle') || undefined,
     })
     if (!parsed.success) return { error: parsed.error.issues[0].message }
 
     const topic = await prisma.topic.update({
       where: { id: parsed.data.topicId },
-      // Empty means "not offered", and null is how the rest of the code asks
-      // that question. Storing "" instead would make a withdrawn topic look
-      // enabled to every `content: { not: null }` filter.
-      data: { content: parsed.data.content || null },
+      data: {
+        // Empty means "not offered", and null is how the rest of the code asks
+        // that question. Storing "" instead would make a withdrawn topic look
+        // enabled to every `content: { not: null }` filter.
+        content: parsed.data.content || null,
+        ...(parsed.data.title ? { title: parsed.data.title } : {}),
+      },
     })
+
+    // The chapter is shared by every topic under it, so it is only written when
+    // the name actually changed — otherwise a save of one topic's material
+    // would touch a row the person saving was not editing.
+    if (parsed.data.chapterTitle) {
+      await prisma.chapter.updateMany({
+        where: { id: topic.chapterId, NOT: { title: parsed.data.chapterTitle } },
+        data: { title: parsed.data.chapterTitle },
+      })
+    }
 
     revalidatePath(`/admin/topic/${topic.id}`)
     revalidatePath(`/admin/chapter/${topic.chapterId}`)
+    revalidatePath('/academic')
     revalidatePath('/guided')
     return { saved: true }
   })) as AdminState
+}
+
+/**
+ * Names a topic and its chapter from the material that was just pasted.
+ *
+ * Called from the material editor as soon as there is something to read, and
+ * again on demand from the button beside the names. It only ever *suggests*:
+ * the two fields it fills are ordinary text inputs that the person uploading
+ * can overwrite, and nothing is written to the database until they save.
+ *
+ * Staff-gated and rate-limited like everything else that spends model tokens.
+ * Not charged against a student's credits or the tutor's daily budget — this is
+ * authoring, and a teacher whose panel stopped naming things because students
+ * had used the day's allowance would have no idea why.
+ */
+export type NameSuggestion = { error?: string; topicTitle?: string; chapterTitle?: string }
+
+const NAMING_LIMIT = { max: 20, windowMs: 60_000 }
+const NAMING_MODEL = process.env.OPENAI_MODEL ?? 'gpt-4o-mini'
+
+export async function suggestTopicNames(topicId: string, content: string): Promise<NameSuggestion> {
+  return (await asStaff(async () => {
+    const text = content.trim()
+    // Short enough and there is nothing to read but a heading; naming from it
+    // produces confident nonsense, which is worse than leaving the field alone.
+    if (text.length < 120) {
+      return { error: 'Paste a bit more before naming it.' }
+    }
+    if (!process.env.OPENAI_API_KEY) {
+      return { error: 'Naming needs OPENAI_API_KEY on the server. Type the names in instead.' }
+    }
+
+    const staff = await requireStaff()
+    const quota = await hit(`naming:u:${staff.id}`, NAMING_LIMIT.max, NAMING_LIMIT.windowMs)
+    if (!quota.ok) return { error: 'Too many naming requests. Try again in a moment.' }
+
+    const topic = await prisma.topic.findUnique({
+      where: { id: topicId },
+      include: {
+        chapter: { include: { course: { include: { subject: true, classLevel: true } } } },
+      },
+    })
+    if (!topic) return { error: 'That topic no longer exists.' }
+
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    try {
+      const completion = await openai.chat.completions.create({
+        model: NAMING_MODEL,
+        // Two short names, so the ceiling is small on purpose: this runs on
+        // every paste and its cost has to stay a rounding error.
+        max_completion_tokens: 120,
+        temperature: 0,
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'topic_names', strict: true, schema: NAMING_SCHEMA },
+        },
+        messages: [
+          {
+            role: 'system',
+            content: namingPrompt({
+              subject: topic.chapter.course.subject.name,
+              classLabel: topic.chapter.course.classLevel.label,
+              currentTopicTitle: topic.title,
+              currentChapterTitle: topic.chapter.title,
+              content: text,
+            }),
+          },
+          { role: 'user', content: 'Name this material.' },
+        ],
+      })
+
+      const names = parseNames(completion.choices[0]?.message?.content ?? '')
+      if (!names) return { error: 'Could not name that one. Type the names in.' }
+      return names
+    } catch (err) {
+      console.error('[admin] naming', err)
+      return { error: 'The namer is unavailable right now. Type the names in.' }
+    }
+  })) as NameSuggestion
 }
 
 const TopicAnswerInput = z.object({

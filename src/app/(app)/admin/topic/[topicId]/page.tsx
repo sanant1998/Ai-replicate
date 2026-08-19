@@ -43,7 +43,13 @@ export default async function AdminTopicPage(props: PageProps<'/admin/topic/[top
         </p>
       </div>
 
-      <MaterialEditor topicId={topic.id} content={topic.content ?? ''} />
+      <MaterialEditor
+        topicId={topic.id}
+        content={topic.content ?? ''}
+        topicTitle={topic.title}
+        chapterTitle={topic.chapter.title}
+        chapterIndex={topic.chapter.index}
+      />
 
       <section className="rounded-3xl card-surface divide-y divide-navy/8">
         <p className="px-6 py-3 text-sm font-extrabold tracking-wider text-navy/45">

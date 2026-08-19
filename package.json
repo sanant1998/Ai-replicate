@@ -16,6 +16,7 @@
     "db:questions": "tsx scripts/sync-questions.mjs",
     "db:tester": "tsx scripts/create-tester.mjs",
     "db:import-topic": "tsx scripts/import-topic.mjs",
+    "db:remove-topic": "tsx scripts/remove-topic.mjs",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
     "test": "tsx --conditions=react-server --test \"tests/**/*.test.ts\"",

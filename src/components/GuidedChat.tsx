@@ -81,7 +81,13 @@ export function GuidedChat({
     }
   }
 
-  async function ask(text: string) {
+  /**
+   * `intent` tells the server which button was pressed, and the server uses it
+   * to decide whether the answer key overrides the model. Re-explaining a step
+   * is the one case where the client's stored wording must not come back: it is
+   * the wording the student has just said they did not follow.
+   */
+  async function ask(text: string, intent: 'ask' | 'explain' = 'ask') {
     const message = text.trim()
     if (!message || busy) return
 
@@ -100,7 +106,7 @@ export function GuidedChat({
       const res = await fetch('/api/guided', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ message, topicId, sessionId }),
+        body: JSON.stringify({ message, topicId, sessionId, intent }),
       })
       const body = await res.json().catch(() => ({}))
 
@@ -245,7 +251,7 @@ export function GuidedChat({
                 }))
               }
               onExplainAgain={(step, n) =>
-                ask(`Explain step ${n} again in simpler words: ${step}`)
+                ask(`Explain step ${n} again in simpler words: ${step}`, 'explain')
               }
               busy={busy}
             />
