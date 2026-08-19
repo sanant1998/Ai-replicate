@@ -26,11 +26,8 @@ const PASSWORD = process.env.VERIFY_TESTER_PASSWORD ?? 'yashika@123'
 // is broken rather than like it is pointed at nothing.
 const TOPIC = process.env.VERIFY_TOPIC_ID
 if (!TOPIC) {
-  console.error(
-    'Set VERIFY_TOPIC_ID to the topic to exercise.
-' +
-      'List them with: npm run db:remove-topic -- --list',
-  )
+  console.error('Set VERIFY_TOPIC_ID to the topic to exercise.')
+  console.error('List them with: npm run db:remove-topic -- --list')
   process.exit(1)
 }
 const KEY_QUESTION =
